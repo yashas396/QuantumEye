@@ -310,6 +310,10 @@ class DataPipeline:
 
         print(f"  Stream queue: {len(self.stream_queue)} transactions")
 
+        # Free the full DataFrame to save memory (keep only the row count)
+        self.total_rows = len(self.df)
+        del self.df
+
     def transform(self, row):
         """Transform a single transaction row to PCA features."""
         features = np.array([float(row.get(c, 0)) for c in self.feature_cols]).reshape(1, -1)
@@ -404,23 +408,13 @@ ibm_manager = IBMQuantumManager() if QISKIT_AVAILABLE else None
 quantum_backend_mode = 'numpy'  # 'numpy' | 'aer_statevector' | 'aer_sampler'
 
 
-def initialize():
-    global model, pipeline, stats
-    print("=" * 60)
-    print("  Quantum Eye - Backend Initialization")
-    print("=" * 60)
-
-    print("\n[1/4] Loading model weights...")
-    weights = load_model_weights()
-    model = QDTFraudModel(weights)
-
-    print("\n[2/4] Initializing data pipeline...")
-    pipeline = DataPipeline(CSV_PATH)
-
-    print("\n[3/4] Calibrating threshold (exact training method)...")
+def _background_calibrate():
+    """Run calibration in background thread so the app starts quickly."""
+    global model, pipeline
+    print("\n[background] Calibrating threshold (exact training method)...")
     calibrated_thresh = pipeline.calibrate(model)
 
-    print("\n[4/4] Running validation with calibrated threshold...")
+    print("[background] Running validation with calibrated threshold...")
     test_rows = pipeline.get_next_batch(10)
     correct = 0
     for i, row in enumerate(test_rows):
@@ -436,11 +430,31 @@ def initialize():
     pipeline.stream_index = 0  # reset
 
     print(f"\n  Validation accuracy: {correct}/{len(test_rows)} ({correct/len(test_rows)*100:.0f}%)")
+    print(f"  Calibrated threshold: {round(calibrated_thresh, 6)}")
+    print("[background] Calibration complete.\n")
+
+
+def initialize():
+    global model, pipeline, stats
+    print("=" * 60)
+    print("  Quantum Eye - Backend Initialization")
+    print("=" * 60)
+
+    print("\n[1/3] Loading model weights...")
+    weights = load_model_weights()
+    model = QDTFraudModel(weights)
+
+    print("\n[2/3] Initializing data pipeline...")
+    pipeline = DataPipeline(CSV_PATH)
 
     stats["start_time"] = time.time()
+
+    print("\n[3/3] Starting background calibration...")
+    threading.Thread(target=_background_calibrate, daemon=True).start()
+
     print("\n" + "=" * 60)
     print("  Backend ready. Serving on http://localhost:5000")
-    print("  Calibrated threshold: " + str(round(calibrated_thresh, 6)))
+    print("  Using base threshold until calibration completes: " + str(BASE_THRESHOLD))
     print("=" * 60 + "\n")
 
 
@@ -460,7 +474,7 @@ def api_status():
         "layers": N_LAYERS,
         "base_threshold": BASE_THRESHOLD,
         "calibrated_threshold": round(getattr(pipeline, 'calibrated_threshold', BASE_THRESHOLD), 8),
-        "total_transactions": len(pipeline.df) if pipeline else 0,
+        "total_transactions": getattr(pipeline, 'total_rows', 0) if pipeline else 0,
         "stream_queue_size": len(pipeline.stream_queue) if pipeline else 0,
         "uptime": round(time.time() - stats["start_time"], 1),
         "qiskit_available": QISKIT_AVAILABLE,
