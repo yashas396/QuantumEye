@@ -1,5 +1,5 @@
 [project]
-name = "quantumeye-aqvh"
+name = "quantum-eye"
 
 [build]
 builder = "nixpacks"

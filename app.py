@@ -407,7 +407,7 @@ quantum_backend_mode = 'numpy'  # 'numpy' | 'aer_statevector' | 'aer_sampler'
 def initialize():
     global model, pipeline, stats
     print("=" * 60)
-    print("  QuantumEye v2.0 - Backend Initialization")
+    print("  Quantum Eye - Backend Initialization")
     print("=" * 60)
 
     print("\n[1/4] Loading model weights...")

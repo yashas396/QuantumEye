@@ -1,4 +1,4 @@
-# ⚛️ QuantumEye - Detailed Technical Documentation
+# ⚛️ Quantum Eye - Detailed Technical Documentation
 
 ## Part 1: Data Pipeline
 
@@ -664,4 +664,4 @@ INPUT                    10 VARIATIONAL LAYERS                    OUTPUT
 
 ---
 
-*QuantumEye v2.0 - Quantum Digital Twin for Fraud Detection*
+*Quantum Eye v2.0 - Quantum Digital Twin for Fraud Detection*
