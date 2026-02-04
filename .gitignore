@@ -1,3 +1,8 @@
+# AI tool configs (exclude)
+.claude/
+.gemini/
+.agent/
+
 # Raw CSV (use compressed .gz for deployment)
 creditcard.csv
 
