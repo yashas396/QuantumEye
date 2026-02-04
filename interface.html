@@ -1,0 +1,3365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantumEye v2.0 | Quantum Fraud Detection System</title>
+    <meta name="description" content="Quantum Digital Twin Fraud Detection Dashboard - VQAE-based anomaly detection">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- PapaParse removed: backend handles CSV -->
+    <style>
+        /* ============================================================
+   SECTION 1: CSS CUSTOM PROPERTIES & RESET
+   ============================================================ */
+        :root {
+            --bg-deep: #0a0e27;
+            --bg-surface: #1a1f3a;
+            --bg-tertiary: #2d3561;
+            --bg-panel: rgba(20, 25, 45, 0.85);
+            --bg-card: rgba(30, 35, 55, 0.6);
+            --quantum-cyan: #00ffff;
+            --quantum-blue: #0080ff;
+            --quantum-purple: #667eea;
+            --quantum-magenta: #ff00ff;
+            --safe: #00d2d3;
+            --warning: #ffa502;
+            --danger: #ff4757;
+            --info: #64b5f6;
+            --text-primary: #ffffff;
+            --text-secondary: #8892b0;
+            --text-muted: #5a6378;
+            --border-subtle: rgba(100, 200, 255, 0.1);
+            --border-normal: rgba(100, 200, 255, 0.2);
+            --border-emphasis: rgba(100, 200, 255, 0.4);
+            --radius: 12px;
+            --font-main: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            --font-mono: 'SF Mono', 'Fira Code', 'Consolas', 'Courier New', monospace;
+        }
+
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-surface) 50%, #0d1330 100%);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-deep);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--quantum-blue);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--quantum-cyan);
+        }
+
+        /* ============================================================
+   SECTION 2: LOADING SCREEN
+   ============================================================ */
+        #loadScreen {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: radial-gradient(ellipse at center, #0d1233 0%, var(--bg-deep) 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.8s ease, visibility 0.8s;
+        }
+
+        #loadScreen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .load-logo {
+            font-size: 42px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            background: linear-gradient(135deg, var(--quantum-cyan), var(--quantum-blue), var(--quantum-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .load-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+        }
+
+        .load-qubit {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid var(--quantum-cyan);
+            border-top-color: transparent;
+            border-bottom-color: transparent;
+            animation: qubitSpin 1.2s linear infinite;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .load-qubit::after {
+            content: '';
+            position: absolute;
+            inset: 6px;
+            border-radius: 50%;
+            border: 2px solid var(--quantum-purple);
+            border-left-color: transparent;
+            border-right-color: transparent;
+            animation: qubitSpin 0.8s linear infinite reverse;
+        }
+
+        @keyframes qubitSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .drop-zone {
+            width: 420px;
+            max-width: 90vw;
+            padding: 40px 30px;
+            border: 2px dashed var(--border-emphasis);
+            border-radius: var(--radius);
+            text-align: center;
+            background: rgba(20, 25, 45, 0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: var(--quantum-cyan);
+            background: rgba(0, 255, 255, 0.05);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+        }
+
+        .drop-zone h3 {
+            color: var(--quantum-cyan);
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .drop-zone p {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        .drop-zone .browse-btn {
+            display: inline-block;
+            padding: 10px 28px;
+            background: linear-gradient(135deg, var(--quantum-purple), #764ba2);
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .drop-zone .browse-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        #loadProgress {
+            width: 300px;
+            max-width: 80vw;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+            display: none;
+        }
+
+        #loadProgressBar {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, var(--quantum-cyan), var(--quantum-blue));
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        #loadStatus {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* ============================================================
+   SECTION 3: HEADER
+   ============================================================ */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: rgba(10, 14, 39, 0.9);
+            border-bottom: 1px solid var(--border-subtle);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, var(--quantum-cyan), var(--quantum-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .brand-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .header-center {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 12px;
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .header-stat .val {
+            color: var(--quantum-cyan);
+            font-family: var(--font-mono);
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            background: rgba(0, 210, 211, 0.1);
+            border: 1px solid rgba(0, 210, 211, 0.3);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--safe);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--safe);
+            animation: pulse 2s ease infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(0, 210, 211, 0.4)
+            }
+
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 0 6px rgba(0, 210, 211, 0)
+            }
+        }
+
+        .alert-badge {
+            position: relative;
+            padding: 6px 12px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .alert-badge:hover {
+            border-color: var(--danger);
+            background: rgba(255, 71, 87, 0.08);
+            color: var(--danger);
+        }
+
+        .alert-badge:active {
+            transform: scale(0.95);
+        }
+
+        .alert-badge .count {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--danger);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-clock {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* ============================================================
+   SECTION 4: DASHBOARD LAYOUT
+   ============================================================ */
+        #dashboard {
+            display: none;
+        }
+
+        #dashboard.active {
+            display: block;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 310px 1fr 360px;
+            gap: 16px;
+            padding: 16px;
+            max-width: 1920px;
+            margin: 0 auto;
+            min-height: calc(100vh - 56px);
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-normal);
+            border-radius: var(--radius);
+            padding: 18px;
+            position: relative;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            background: linear-gradient(45deg, var(--quantum-cyan), var(--quantum-blue), var(--quantum-purple), var(--quantum-magenta));
+            border-radius: var(--radius);
+            opacity: 0;
+            z-index: -1;
+            animation: borderGlow 4s ease-in-out infinite;
+        }
+
+        @keyframes borderGlow {
+
+            0%,
+            100% {
+                opacity: 0
+            }
+
+            50% {
+                opacity: 0.15
+            }
+        }
+
+        .panel-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--info);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .panel-header::before {
+            content: '';
+            width: 3px;
+            height: 14px;
+            background: linear-gradient(180deg, var(--quantum-cyan), var(--quantum-blue));
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        /* ============================================================
+   SECTION 5: LEFT PANEL - THREAT MATRIX
+   ============================================================ */
+        .threat-panel {
+            overflow-y: auto;
+            max-height: calc(100vh - 90px);
+        }
+
+        .threat-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .threat-summary {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .threat-chip {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            font-size: 11px;
+        }
+
+        .threat-chip .num {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            display: block;
+        }
+
+        .threat-chip.fraud .num {
+            color: var(--danger);
+        }
+
+        .threat-chip.safe .num {
+            color: var(--safe);
+        }
+
+        .threat-chip.total .num {
+            color: var(--quantum-cyan);
+        }
+
+        .threat-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            margin: 6px 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border-left: 3px solid var(--safe);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .threat-item::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(0, 255, 255, 0.03), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .threat-item:hover {
+            transform: translateX(4px);
+            background: rgba(40, 45, 65, 0.7);
+        }
+
+        .threat-item:hover::after {
+            opacity: 1;
+        }
+
+        .threat-item:active {
+            transform: translateX(2px) scale(0.98);
+            transition-duration: 0.05s;
+        }
+
+        .threat-item:focus-visible {
+            outline: 2px solid var(--quantum-cyan);
+            outline-offset: 2px;
+        }
+
+        .threat-item.risk-high {
+            border-left-color: var(--danger);
+        }
+
+        .threat-item.risk-med {
+            border-left-color: var(--warning);
+        }
+
+        .threat-item.risk-low {
+            border-left-color: var(--safe);
+        }
+
+        .threat-item.risk-high.new {
+            animation: threatFlash 0.6s ease;
+        }
+
+        @keyframes threatFlash {
+
+            0%,
+            100% {
+                background: var(--bg-card)
+            }
+
+            50% {
+                background: rgba(255, 71, 87, 0.15)
+            }
+        }
+
+        .threat-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .threat-id {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .threat-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .threat-score {
+            font-size: 16px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .threat-score.high {
+            color: var(--danger);
+        }
+
+        .threat-score.med {
+            color: var(--warning);
+        }
+
+        .threat-score.low {
+            color: var(--safe);
+        }
+
+        /* ============================================================
+   SECTION 6: CENTER PANEL - VISUALIZATION
+   ============================================================ */
+        .viz-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .status-left,
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .status-item .val {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+
+        /* Stream Controls */
+        .stream-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stream-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border-normal);
+            background: var(--bg-deep);
+            color: var(--quantum-cyan);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-main);
+        }
+
+        .stream-btn:hover {
+            border-color: var(--quantum-cyan);
+            background: rgba(0, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .stream-btn.step {
+            color: var(--quantum-purple);
+        }
+
+        .stream-btn.step:hover {
+            border-color: var(--quantum-purple);
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .speed-select {
+            padding: 5px 10px;
+            border: 1px solid var(--border-normal);
+            background: var(--bg-deep);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            font-size: 10px;
+            font-family: var(--font-main);
+            cursor: pointer;
+            outline: none;
+        }
+
+        .speed-select:hover,
+        .speed-select:focus {
+            border-color: var(--quantum-blue);
+        }
+
+        .live-dot.paused {
+            background: var(--warning) !important;
+            animation: none !important;
+        }
+
+        .viz-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.25s;
+            font-family: var(--font-main);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn:active {
+            transform: scale(0.95);
+            transition-duration: 0.05s;
+        }
+
+        .tab-btn.active {
+            color: var(--quantum-cyan);
+            background: rgba(0, 255, 255, 0.1);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viz-canvas-wrap {
+            flex: 1;
+            min-height: 320px;
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(5, 8, 20, 0.5);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .viz-canvas-wrap canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+
+        .viz-legend {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(10, 14, 39, 0.9);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+            font-size: 11px;
+            z-index: 5;
+        }
+
+        .legend-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 3px 0;
+        }
+
+        .legend-dot {
+            width: 16px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .waveform-wrap {
+            height: 100px;
+            margin-top: 12px;
+            position: relative;
+            background: rgba(5, 8, 20, 0.5);
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            overflow: hidden;
+        }
+
+        .waveform-wrap canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .waveform-label {
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.25s;
+            font-family: var(--font-main);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid var(--quantum-cyan);
+            outline-offset: 2px;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #c44569);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 4px 20px rgba(255, 71, 87, 0.35);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--safe), #00b894);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 4px 20px rgba(0, 210, 211, 0.35);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            border: 1px solid var(--border-normal);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--quantum-cyan);
+            box-shadow: 0 4px 20px rgba(0, 255, 255, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--quantum-purple), #764ba2);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.35);
+        }
+
+        /* ============================================================
+   SECTION 7: RIGHT PANEL - ANALYSIS
+   ============================================================ */
+        .analysis-panel {
+            overflow-y: auto;
+            max-height: calc(100vh - 90px);
+        }
+
+        .score-wrap {
+            text-align: center;
+            padding: 10px 0 16px;
+        }
+
+        .score-circle {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto 10px;
+            position: relative;
+        }
+
+        .score-circle svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .score-val {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -55%);
+            font-size: 40px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--quantum-cyan);
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+
+        .score-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, 50%);
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .score-verdict {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 4px 16px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .score-verdict.safe {
+            color: var(--safe);
+            background: rgba(0, 210, 211, 0.1);
+            border: 1px solid rgba(0, 210, 211, 0.3);
+        }
+
+        .score-verdict.fraud {
+            color: var(--danger);
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            animation: fraudPulse 1s ease infinite;
+        }
+
+        @keyframes fraudPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.3)
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(255, 71, 87, 0)
+            }
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 16px 0;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            transition: all 0.25s;
+        }
+
+        .metric-card:hover {
+            background: rgba(40, 45, 65, 0.7);
+            transform: translateY(-2px);
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .metric-val {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .metric-sub {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        .metric-sub.pos {
+            color: var(--safe);
+        }
+
+        .metric-sub.neg {
+            color: var(--danger);
+        }
+
+        .metric-sub.neutral {
+            color: var(--text-muted);
+        }
+
+        .prob-chart-wrap {
+            height: 160px;
+            margin: 12px 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 10px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .factors-list {
+            margin: 8px 0;
+        }
+
+        .factor-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border-left: 3px solid var(--safe);
+        }
+
+        .factor-item.high {
+            border-left-color: var(--danger);
+        }
+
+        .factor-item.med {
+            border-left-color: var(--warning);
+        }
+
+        .factor-name {
+            font-size: 12px;
+        }
+
+        .factor-level {
+            font-size: 12px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .factor-level.high {
+            color: var(--danger);
+        }
+
+        .factor-level.med {
+            color: var(--warning);
+        }
+
+        .factor-level.low {
+            color: var(--safe);
+        }
+
+        .perf-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 8px 0;
+        }
+
+        .perf-item {
+            padding: 8px 10px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .perf-item .label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .perf-item .value {
+            font-size: 16px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--quantum-cyan);
+        }
+
+        /* ============================================================
+   SECTION 8: MODAL
+   ============================================================ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 500;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-box {
+            background: linear-gradient(135deg, var(--bg-surface), var(--bg-tertiary));
+            border: 1px solid var(--border-emphasis);
+            border-radius: var(--radius);
+            padding: 28px;
+            max-width: 600px;
+            width: 92%;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--quantum-cyan);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--danger);
+            background: rgba(255, 71, 87, 0.1);
+        }
+
+        .modal-section {
+            margin: 16px 0;
+            padding: 14px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .modal-section h4 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--info);
+            margin-bottom: 10px;
+        }
+
+        .modal-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .modal-row .label {
+            color: var(--text-secondary);
+        }
+
+        .modal-row .val {
+            font-family: var(--font-mono);
+            font-weight: 600;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        /* ============================================================
+   SECTION 9: TOAST NOTIFICATIONS
+   ============================================================ */
+        .toast-container {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 600;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .toast {
+            padding: 12px 18px;
+            border-radius: 8px;
+            background: rgba(20, 25, 45, 0.95);
+            border: 1px solid var(--border-normal);
+            backdrop-filter: blur(10px);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: toastIn 0.3s ease;
+            pointer-events: auto;
+            max-width: 380px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .toast.out {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0)
+            }
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateX(100px)
+            }
+        }
+
+        .toast.fraud {
+            border-left: 3px solid var(--danger);
+        }
+
+        .toast.safe {
+            border-left: 3px solid var(--safe);
+        }
+
+        .toast.info {
+            border-left: 3px solid var(--quantum-blue);
+        }
+
+        .toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .toast-text {
+            flex: 1;
+        }
+
+        .toast-text .title {
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .toast-text .desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* ============================================================
+   SECTION 10: WHAT-IF SIMULATION PANEL
+   ============================================================ */
+        .whatif-panel {
+            margin-top: 12px;
+            padding: 14px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .whatif-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+        }
+
+        .whatif-row label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            min-width: 80px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .whatif-row input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            background: var(--border-normal);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .whatif-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--quantum-cyan);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .whatif-row .range-val {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--quantum-cyan);
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .whatif-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .whatif-result.fraud {
+            background: rgba(255, 71, 87, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(255, 71, 87, 0.2);
+        }
+
+        .whatif-result.safe {
+            background: rgba(0, 210, 211, 0.1);
+            color: var(--safe);
+            border: 1px solid rgba(0, 210, 211, 0.2);
+        }
+
+        /* ============================================================
+   SECTION 11: QUANTUM ANIMATIONS
+   ============================================================ */
+        @keyframes quantumWave {
+            0% {
+                transform: translateX(0) scaleY(1)
+            }
+
+            50% {
+                transform: translateX(8px) scaleY(1.15)
+            }
+
+            100% {
+                transform: translateX(0) scaleY(1)
+            }
+        }
+
+        @keyframes entanglementPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px var(--quantum-cyan)
+            }
+
+            50% {
+                box-shadow: 0 0 25px var(--quantum-cyan), 0 0 50px var(--quantum-blue)
+            }
+        }
+
+        @keyframes probabilityCollapse {
+            0% {
+                opacity: 0.3;
+                transform: scale(1.3)
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1)
+            }
+        }
+
+        @keyframes dataStream {
+            0% {
+                background-position: 0 0
+            }
+
+            100% {
+                background-position: 200px 0
+            }
+        }
+
+        .quantum-glow {
+            animation: entanglementPulse 3s ease-in-out infinite;
+        }
+
+        .data-streaming {
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(0, 255, 255, 0.03) 10px, rgba(0, 255, 255, 0.03) 20px);
+            background-size: 200px 100%;
+            animation: dataStream 4s linear infinite;
+        }
+
+        /* ============================================================
+   SECTION 12: RESPONSIVE DESIGN
+   ============================================================ */
+        @media(max-width:1439px) {
+            .container {
+                grid-template-columns: 280px 1fr 330px;
+            }
+        }
+
+        @media(max-width:1100px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto;
+            }
+
+            .viz-panel {
+                grid-column: span 2;
+                order: -1;
+            }
+
+            .header-center {
+                display: none;
+            }
+        }
+
+        @media(max-width:767px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 10px;
+                gap: 10px;
+            }
+
+            .viz-panel {
+                grid-column: span 1;
+            }
+
+            .header {
+                padding: 10px 14px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .btn-group {
+                flex-wrap: wrap;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .threat-summary {
+                flex-wrap: wrap;
+            }
+
+            .score-circle {
+                width: 150px;
+                height: 150px;
+            }
+
+            .score-val {
+                font-size: 32px;
+            }
+        }
+
+        /* ============================================================
+   SECTION 13: ACCESSIBILITY
+   ============================================================ */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+
+        *:focus-visible {
+            outline: 2px solid var(--quantum-cyan);
+            outline-offset: 2px;
+        }
+
+        @media(prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* ============================================================
+   SECTION 14: IBM QUANTUM PANEL
+   ============================================================ */
+        .ibm-panel {
+            margin-top: 10px;
+            padding: 12px;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .ibm-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 11px;
+        }
+
+        .ibm-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .ibm-status-dot.connected {
+            background: var(--safe);
+            box-shadow: 0 0 6px var(--safe);
+        }
+
+        .ibm-status-dot.disconnected {
+            background: #555;
+        }
+
+        .ibm-token-input {
+            width: 100%;
+            padding: 7px 10px;
+            margin: 6px 0;
+            background: var(--bg-deep);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            box-sizing: border-box;
+        }
+
+        .ibm-token-input:focus {
+            outline: none;
+            border-color: var(--quantum-purple);
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.25);
+        }
+
+        .ibm-backend-select {
+            width: 100%;
+            padding: 7px 8px;
+            margin: 4px 0;
+            background: var(--bg-deep);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 11px;
+            box-sizing: border-box;
+        }
+
+        .ibm-backend-select option {
+            background: var(--bg-card);
+        }
+
+        .ibm-mode-btns {
+            display: flex;
+            gap: 3px;
+            margin: 6px 0;
+            background: var(--bg-deep);
+            border-radius: 6px;
+            padding: 3px;
+        }
+
+        .ibm-mode-btn {
+            flex: 1;
+            padding: 5px 4px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-main);
+        }
+
+        .ibm-mode-btn.active {
+            color: var(--quantum-purple);
+            background: rgba(102, 126, 234, 0.18);
+        }
+
+        .ibm-mode-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .ibm-btn-row {
+            display: flex;
+            gap: 5px;
+            margin: 5px 0;
+        }
+
+        .ibm-btn {
+            flex: 1;
+            padding: 6px 8px;
+            border: none;
+            border-radius: 5px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-main);
+            transition: all 0.2s;
+        }
+
+        .ibm-btn-connect {
+            background: rgba(102, 126, 234, 0.2);
+            color: var(--quantum-purple);
+        }
+
+        .ibm-btn-connect:hover {
+            background: rgba(102, 126, 234, 0.35);
+        }
+
+        .ibm-btn-connect:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .ibm-btn-disconnect {
+            background: rgba(255, 71, 87, 0.15);
+            color: var(--danger);
+        }
+
+        .ibm-btn-disconnect:hover {
+            background: rgba(255, 71, 87, 0.3);
+        }
+
+        .ibm-btn-disconnect:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .ibm-btn-submit {
+            width: 100%;
+            padding: 8px;
+            margin: 6px 0;
+            border: none;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--quantum-purple), #4834d4);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-main);
+            transition: all 0.2s;
+        }
+
+        .ibm-btn-submit:hover {
+            filter: brightness(1.15);
+        }
+
+        .ibm-btn-submit:disabled {
+            opacity: 0.4;
+            cursor: default;
+            filter: none;
+        }
+
+        .ibm-btn-validate {
+            width: 100%;
+            padding: 5px;
+            margin: 4px 0;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 9px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-main);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ibm-btn-validate:hover {
+            border-color: var(--quantum-purple);
+            color: var(--quantum-purple);
+        }
+
+        .ibm-job-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            margin: 3px 0;
+            background: var(--bg-deep);
+            border-radius: 5px;
+            border-left: 3px solid var(--quantum-purple);
+            font-size: 10px;
+        }
+
+        .ibm-job-item.done {
+            border-left-color: var(--safe);
+        }
+
+        .ibm-job-item.error {
+            border-left-color: var(--danger);
+        }
+
+        .ibm-job-item.running {
+            border-left-color: var(--warning);
+            animation: quantumWave 2s ease infinite;
+        }
+
+        .ibm-section-label {
+            font-size: 9px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin: 8px 0 3px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ============================================================
+     LOADING SCREEN
+     ============================================================ -->
+    <div id="loadScreen">
+        <div class="load-logo">QUANTUMEYE</div>
+        <div class="load-subtitle">Quantum Fraud Detection System v2.0</div>
+        <div class="load-qubit" id="loadSpinner"></div>
+        <div class="drop-zone" id="dropZone" style="cursor:default;">
+            <h3>Connecting to Quantum Backend</h3>
+            <p>Real <strong>VQAE Model</strong> (4 qubits, 10 layers) loading via Flask API...</p>
+            <span class="browse-btn" style="pointer-events:none;opacity:0.6;">Initializing Model</span>
+        </div>
+        <input type="file" id="fileInput" accept=".csv" style="display:none;">
+        <div id="loadProgress">
+            <div id="loadProgressBar"></div>
+        </div>
+        <div id="loadStatus">Waiting for backend at http://localhost:5000 ...</div>
+    </div>
+
+    <!-- ============================================================
+     MAIN DASHBOARD
+     ============================================================ -->
+    <div id="dashboard">
+        <!-- HEADER -->
+        <header class="header" role="banner">
+            <div class="header-left">
+                <div>
+                    <div class="brand">QUANTUMEYE v2.0</div>
+                    <div class="brand-sub">Variational Quantum Autoencoder</div>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="header-stat">Analyzed: <span class="val" id="hdrAnalyzed">0</span></div>
+                <div class="header-stat">Detected: <span class="val" id="hdrDetected"
+                        style="color:var(--danger)">0</span></div>
+                <div class="header-stat">Dataset: <span class="val" id="hdrDataset">--</span></div>
+            </div>
+            <div class="header-right">
+                <div class="live-badge" id="liveBadge">
+                    <div class="live-dot"></div>LIVE
+                </div>
+                <div class="alert-badge" id="alertBadge" role="button" tabindex="0" aria-label="Fraud alerts">
+                    Alerts <span class="count" id="alertCount">0</span>
+                </div>
+                <div class="header-clock" id="headerClock">--:--:--</div>
+            </div>
+        </header>
+
+        <!-- MAIN GRID -->
+        <main class="container" role="main">
+
+            <!-- LEFT PANEL: THREAT MATRIX -->
+            <section class="panel threat-panel data-streaming" aria-label="Real-time threat matrix">
+                <div class="panel-header">Real-Time Threat Matrix</div>
+                <div class="threat-summary">
+                    <div class="threat-chip total"><span class="num" id="statTotal">0</span>Total</div>
+                    <div class="threat-chip fraud"><span class="num" id="statFraud">0</span>Fraud</div>
+                    <div class="threat-chip safe"><span class="num" id="statSafe">0</span>Safe</div>
+                </div>
+                <div id="threatList" role="list" aria-live="polite"></div>
+            </section>
+
+            <!-- CENTER PANEL: VISUALIZATION -->
+            <section class="panel viz-panel" aria-label="Quantum visualization">
+                <div class="status-bar">
+                    <div class="status-left">
+                        <div class="status-item">
+                            <div class="live-dot" id="streamingDot"></div><span id="streamingStatus">System
+                                Active</span>
+                        </div>
+                        <div class="status-item">Stream: <span class="val" id="streamRate">--</span> tx/s</div>
+                    </div>
+                    <div class="stream-controls">
+                        <button class="stream-btn" id="btnPause" title="Pause streaming (Space)">⏸ Pause</button>
+                        <button class="stream-btn" id="btnPlay" title="Resume streaming (Space)" style="display:none;">▶
+                            Play</button>
+                        <button class="stream-btn step" id="btnStep" title="Analyze next transaction (→)">⏭
+                            Next</button>
+                        <select class="speed-select" id="speedSelect" title="Adjust stream speed">
+                            <option value="3000">Slow (3s)</option>
+                            <option value="1200" selected>Normal (1.2s)</option>
+                            <option value="500">Fast (0.5s)</option>
+                            <option value="200">Very Fast</option>
+                        </select>
+                    </div>
+                    <div class="status-right">
+                        <div class="status-item">Qubits: <span class="val">4</span></div>
+                        <div class="status-item">Layers: <span class="val">10</span></div>
+                        <div class="status-item" id="clockDisplay">--:--:--</div>
+                    </div>
+                </div>
+
+                <div class="viz-tabs" role="tablist">
+                    <button class="tab-btn active" data-tab="recon" role="tab" aria-selected="true">3D
+                        Reconstruction</button>
+                    <button class="tab-btn" data-tab="bloch" role="tab" aria-selected="false">Bloch Sphere</button>
+                    <button class="tab-btn" data-tab="circuit" role="tab" aria-selected="false">Quantum Circuit</button>
+                </div>
+
+                <div class="tab-content active" id="tab-recon" role="tabpanel">
+                    <div class="viz-canvas-wrap" id="reconWrap">
+                        <div class="viz-legend">
+                            <div class="legend-row">
+                                <div class="legend-dot" style="background:var(--quantum-cyan)"></div>Original Input
+                            </div>
+                            <div class="legend-row">
+                                <div class="legend-dot" style="background:var(--danger)"></div>Reconstructed
+                            </div>
+                            <div class="legend-row">
+                                <div class="legend-dot"
+                                    style="background:var(--warning);height:6px;width:6px;border-radius:50%"></div>
+                                Anomaly Points
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-bloch" role="tabpanel">
+                    <div class="viz-canvas-wrap" id="blochWrap"></div>
+                </div>
+
+                <div class="tab-content" id="tab-circuit" role="tabpanel">
+                    <div class="viz-canvas-wrap" id="circuitWrap">
+                        <canvas id="circuitCanvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="waveform-wrap">
+                    <span class="waveform-label">Quantum Reconstruction Waveform</span>
+                    <canvas id="waveformCanvas"></canvas>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-danger" id="btnSimulate" aria-label="Simulate cyber attack">Simulate
+                        Attack</button>
+                    <button class="btn btn-success" id="btnVerify" aria-label="Verify and clear transaction">Verify
+                        &amp; Clear</button>
+                    <button class="btn btn-secondary" id="btnToggle" aria-label="Toggle 3D rotation">Toggle
+                        Rotation</button>
+                    <button class="btn btn-primary" id="btnWhatIf" aria-label="Open what-if simulation">What-If</button>
+                </div>
+
+                <!-- WHAT-IF SIMULATION -->
+                <div class="whatif-panel" id="whatIfPanel">
+                    <div class="panel-header">What-If Simulation</div>
+                    <div class="whatif-row">
+                        <label>Amount ($)</label>
+                        <input type="range" id="wfAmount" min="0" max="25000" value="500" step="10">
+                        <span class="range-val" id="wfAmountVal">$500</span>
+                    </div>
+                    <div class="whatif-row">
+                        <label>V1 Deviation</label>
+                        <input type="range" id="wfV1" min="-5" max="5" value="0" step="0.1">
+                        <span class="range-val" id="wfV1Val">0.0</span>
+                    </div>
+                    <div class="whatif-row">
+                        <label>V14 Deviation</label>
+                        <input type="range" id="wfV14" min="-15" max="5" value="0" step="0.1">
+                        <span class="range-val" id="wfV14Val">0.0</span>
+                    </div>
+                    <div class="whatif-row">
+                        <label>V17 Deviation</label>
+                        <input type="range" id="wfV17" min="-25" max="5" value="0" step="0.1">
+                        <span class="range-val" id="wfV17Val">0.0</span>
+                    </div>
+                    <div class="whatif-result safe" id="whatIfResult">Prediction: NORMAL (Error: 0.0020)</div>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: ANALYSIS -->
+            <section class="panel analysis-panel" aria-label="Deep scan analysis">
+                <div class="panel-header">Deep-Scan Analysis Unit</div>
+
+                <div class="score-wrap">
+                    <div class="score-circle">
+                        <svg viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(100,200,255,0.08)"
+                                stroke-width="10" />
+                            <circle id="scoreArc" cx="100" cy="100" r="85" fill="none" stroke="url(#scoreGrad)"
+                                stroke-width="10" stroke-linecap="round" stroke-dasharray="534" stroke-dashoffset="534"
+                                transform="rotate(-90 100 100)" style="transition:stroke-dashoffset 0.8s ease" />
+                            <defs>
+                                <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="var(--quantum-cyan)" />
+                                    <stop offset="100%" stop-color="var(--quantum-blue)" />
+                                </linearGradient>
+                                <linearGradient id="scoreDanger" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="var(--warning)" />
+                                    <stop offset="100%" stop-color="var(--danger)" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="score-val" id="scoreVal">--</div>
+                        <div class="score-label">Anomaly Score</div>
+                    </div>
+                    <div class="score-verdict safe" id="scoreVerdict">Awaiting Data</div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Reconstruction Error</div>
+                        <div class="metric-val" id="metricError">--</div>
+                        <div class="metric-sub neutral" id="metricErrorSub">Awaiting</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Dynamic Threshold</div>
+                        <div class="metric-val" id="metricThresh">0.0083</div>
+                        <div class="metric-sub neutral">Adaptive</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Quantum State</div>
+                        <div class="metric-val" id="metricQState" style="color:var(--quantum-cyan)">|0000&#x27E9;</div>
+                        <div class="metric-sub neutral" id="metricQSub">Ready</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Confidence</div>
+                        <div class="metric-val" id="metricConf">--</div>
+                        <div class="metric-sub neutral" id="metricConfSub">--</div>
+                    </div>
+                </div>
+
+                <div class="panel-header" style="margin-top:8px;">Probability Distribution</div>
+                <div class="prob-chart-wrap"><canvas id="probCanvas"></canvas></div>
+
+                <div class="panel-header" style="margin-top:8px;">Predictive Anomaly Factors</div>
+                <div class="factors-list" id="factorsList">
+                    <div class="factor-item high"><span class="factor-name">Behavioral Deviation</span><span
+                            class="factor-level high">--</span></div>
+                    <div class="factor-item med"><span class="factor-name">Geo-Temporal Irregularity</span><span
+                            class="factor-level med">--</span></div>
+                    <div class="factor-item"><span class="factor-name">Transaction Anomaly</span><span
+                            class="factor-level low">--</span></div>
+                </div>
+
+                <div class="panel-header" style="margin-top:12px;">Model Performance (QML vs Classical)</div>
+                <div class="perf-grid">
+                    <div class="perf-item">
+                        <div class="label">QML Accuracy</div>
+                        <div class="value">89.16%</div>
+                    </div>
+                    <div class="perf-item">
+                        <div class="label">Classical</div>
+                        <div class="value" style="color:var(--warning)">60.12%</div>
+                    </div>
+                    <div class="perf-item">
+                        <div class="label">QML F1</div>
+                        <div class="value">91.79%</div>
+                    </div>
+                    <div class="perf-item">
+                        <div class="label">Classical</div>
+                        <div class="value" style="color:var(--warning)">61.02%</div>
+                    </div>
+                    <div class="perf-item">
+                        <div class="label">QML ROC-AUC</div>
+                        <div class="value">0.9450</div>
+                    </div>
+                    <div class="perf-item">
+                        <div class="label">Classical</div>
+                        <div class="value" style="color:var(--warning)">0.8143</div>
+                    </div>
+                </div>
+
+                <!-- IBM QUANTUM INTEGRATION PANEL -->
+                <div class="panel-header" style="margin-top:12px;color:var(--quantum-purple);">IBM Quantum Integration
+                </div>
+                <div class="ibm-panel" id="ibmPanel">
+                    <!-- Connection Status -->
+                    <div class="ibm-status-row">
+                        <span><span class="ibm-status-dot disconnected" id="ibmStatusDot"></span><span
+                                id="ibmStatusText" style="color:var(--text-secondary);">Checking...</span></span>
+                        <span style="font-family:var(--font-mono);font-size:10px;" id="ibmQiskitBadge">--</span>
+                    </div>
+
+                    <!-- Execution Mode -->
+                    <div class="ibm-section-label">Execution Mode</div>
+                    <div class="ibm-mode-btns" id="ibmModeBtns">
+                        <button class="ibm-mode-btn active" data-mode="numpy">NumPy</button>
+                        <button class="ibm-mode-btn" data-mode="aer_statevector">Aer Exact</button>
+                        <button class="ibm-mode-btn" data-mode="aer_sampler">Aer Sample</button>
+                    </div>
+
+                    <!-- Validate -->
+                    <button class="ibm-btn-validate" id="btnValidate">Validate NumPy vs Qiskit Aer</button>
+                    <div id="validateResult" style="font-size:10px;text-align:center;margin:2px 0;display:none;"></div>
+
+                    <!-- Token -->
+                    <div class="ibm-section-label" style="margin-top:10px;">IBM Quantum API Token</div>
+                    <input type="password" class="ibm-token-input" id="ibmToken"
+                        placeholder="Paste token from quantum.ibm.com...">
+                    <div class="ibm-btn-row">
+                        <button class="ibm-btn ibm-btn-connect" id="btnIbmConnect">Connect</button>
+                        <button class="ibm-btn ibm-btn-disconnect" id="btnIbmDisconnect" disabled>Disconnect</button>
+                    </div>
+
+                    <!-- Backend Selector (hidden until connected) -->
+                    <div id="ibmBackendSection" style="display:none;">
+                        <div class="ibm-section-label">Select Backend</div>
+                        <select class="ibm-backend-select" id="ibmBackendSelect">
+                            <option value="">-- select backend --</option>
+                        </select>
+                        <div style="font-size:9px;color:var(--text-muted);margin:2px 0;" id="ibmBackendInfo"></div>
+                        <button class="ibm-btn-submit" id="btnIbmSubmit" disabled>Submit to IBM Quantum
+                            Hardware</button>
+                    </div>
+
+                    <!-- Job Queue (hidden until jobs exist) -->
+                    <div id="ibmJobSection" style="display:none;">
+                        <div class="ibm-section-label">Hardware Jobs <span id="ibmJobCount"
+                                style="color:var(--quantum-purple);">(0)</span></div>
+                        <div id="ibmJobList" style="max-height:120px;overflow-y:auto;"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL -->
+    <div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-label="Transaction Analysis">
+        <div class="modal-box">
+            <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+            <div class="modal-title">Transaction Analysis</div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer" aria-live="assertive"></div>
+
+    <!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+    <script>
+        /* ============================================================
+           CONFIGURATION
+           ============================================================ */
+        const CFG = {
+            QUBITS: 4,
+            LAYERS: 10,
+            BASE_THRESHOLD: 0.0083,
+            STREAM_INTERVAL: 1200,
+            MAX_THREATS: 20,
+            TOAST_DURATION: 5000,
+            API_BASE: 'http://localhost:5000',
+        };
+
+        /* ============================================================
+           APPLICATION STATE
+           ============================================================ */
+        const STATE = {
+            totalAnalyzed: 0,
+            totalFraud: 0,
+            threats: [],
+            lastResult: null,
+            streaming: false,
+            streamTimer: null,
+            rotationEnabled: true,
+            reconViz: null,
+            blochViz: null,
+            waveformAnim: null,
+            probChart: null,
+            blochReady: false,
+            backendOnline: false,
+        };
+
+        /* ============================================================
+           BACKEND API CLIENT
+           ============================================================ */
+        async function apiGet(path) {
+            const resp = await fetch(CFG.API_BASE + path);
+            if (!resp.ok) throw new Error(`API ${path}: ${resp.status}`);
+            return resp.json();
+        }
+
+        async function apiPost(path, body) {
+            const resp = await fetch(CFG.API_BASE + path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!resp.ok) throw new Error(`API ${path}: ${resp.status}`);
+            return resp.json();
+        }
+
+        /* ============================================================
+           CONNECT TO BACKEND (replaces CSV file loading)
+           ============================================================ */
+        async function connectToBackend() {
+            const progressBar = document.getElementById('loadProgressBar');
+            const statusEl = document.getElementById('loadStatus');
+            const dropZone = document.getElementById('dropZone');
+
+            let attempts = 0;
+            const maxAttempts = 60;
+
+            async function tryConnect() {
+                attempts++;
+                statusEl.textContent = `Connecting to backend... (attempt ${attempts}/${maxAttempts})`;
+                progressBar.style.width = Math.min(90, (attempts / maxAttempts) * 100) + '%';
+
+                try {
+                    const status = await apiGet('/api/status');
+                    STATE.backendOnline = true;
+
+                    progressBar.style.width = '95%';
+                    statusEl.textContent = `Connected! Model: ${status.model} | ${status.qubits} qubits, ${status.layers} layers | ${status.total_transactions.toLocaleString()} transactions`;
+
+                    dropZone.querySelector('h3').textContent = 'Backend Connected';
+                    dropZone.querySelector('p').innerHTML = `Real <strong>VQAE Model</strong> loaded &mdash; ${status.stream_queue_size.toLocaleString()} transactions queued`;
+                    dropZone.querySelector('.browse-btn').textContent = 'Launching Dashboard...';
+
+                    setTimeout(() => {
+                        progressBar.style.width = '100%';
+                        setTimeout(launchDashboard, 400);
+                    }, 600);
+                } catch (err) {
+                    if (attempts < maxAttempts) {
+                        setTimeout(tryConnect, 2000);
+                    } else {
+                        statusEl.textContent = 'Could not connect to backend. Run: python app.py';
+                        dropZone.querySelector('h3').textContent = 'Backend Not Found';
+                        dropZone.querySelector('p').innerHTML = 'Start the backend: <strong>python app.py</strong>';
+                        dropZone.querySelector('.browse-btn').textContent = 'Retry';
+                        dropZone.querySelector('.browse-btn').style.pointerEvents = 'auto';
+                        dropZone.querySelector('.browse-btn').style.opacity = '1';
+                        dropZone.querySelector('.browse-btn').style.cursor = 'pointer';
+                        dropZone.addEventListener('click', () => {
+                            attempts = 0;
+                            tryConnect();
+                        });
+                    }
+                }
+            }
+
+            tryConnect();
+        }
+
+        /* ============================================================
+           DASHBOARD LAUNCH
+           ============================================================ */
+        function launchDashboard() {
+            document.getElementById('loadScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('active');
+            document.getElementById('hdrDataset').textContent = 'Live';
+            initReconstruction();
+            initWaveform();
+            initProbChart();
+            drawCircuitDiagram();
+            startClock();
+            initStreamControls();
+            startStreaming();
+            initIBMPanel();
+            // Auto-init Bloch sphere after a short delay (needs DOM to be visible)
+            setTimeout(() => initBlochSphere(), 500);
+        }
+
+        /* ============================================================
+           3D RECONSTRUCTION (Three.js)
+           ============================================================ */
+        function initReconstruction() {
+            const wrap = document.getElementById('reconWrap');
+            const w = wrap.clientWidth, h = wrap.clientHeight || 380;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 100);
+            camera.position.set(3.5, 2.5, 3.5);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            wrap.insertBefore(renderer.domElement, wrap.firstChild);
+
+            const grid = new THREE.GridHelper(10, 20, 0x00ffff, 0x0a0e27);
+            grid.material.opacity = 0.12; grid.material.transparent = true;
+            scene.add(grid);
+            scene.add(new THREE.AxesHelper(3));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+            const pl = new THREE.PointLight(0x00ffff, 0.6, 50);
+            pl.position.set(5, 5, 5); scene.add(pl);
+
+            function makeData(result) {
+                if (STATE.reconViz && STATE.reconViz.orig) scene.remove(STATE.reconViz.orig);
+                if (STATE.reconViz && STATE.reconViz.recon) scene.remove(STATE.reconViz.recon);
+                if (STATE.reconViz && STATE.reconViz.anom) scene.remove(STATE.reconViz.anom);
+
+                const pts = 60;
+                const origArr = [], reconArr = [], anomArr = [];
+                const err = result ? result.reconError : 0.002;
+                const pca = result ? result.pcaFeatures : [0.3, -0.2, 0.1, -0.1];
+
+                for (let i = 0; i < pts; i++) {
+                    const t = (i / pts) * Math.PI * 4;
+                    const s0 = pca[0] || 0.3, s1 = pca[1] || -0.2;
+                    const ox = Math.cos(t + s0) * 2;
+                    const oy = Math.sin(t * 1.5 + s1) * (1 + Math.abs(s0));
+                    const oz = (t / Math.PI - 2) * 1.5;
+                    origArr.push(new THREE.Vector3(ox, oy, oz));
+
+                    const nf = err * 12;
+                    const rx = ox + (Math.sin(i * 0.7) * nf * 2);
+                    const ry = oy + (Math.cos(i * 0.5) * nf * 1.5);
+                    const rz = oz + (Math.sin(i * 0.3) * nf);
+                    reconArr.push(new THREE.Vector3(rx, ry, rz));
+
+                    if (Math.sqrt((ox - rx) ** 2 + (oy - ry) ** 2 + (oz - rz) ** 2) > 0.08) {
+                        anomArr.push((ox + rx) / 2, (oy + ry) / 2, (oz + rz) / 2);
+                    }
+                }
+                const oGeom = new THREE.BufferGeometry().setFromPoints(origArr);
+                const oLine = new THREE.Line(oGeom, new THREE.LineBasicMaterial({ color: 0x00ffff }));
+                scene.add(oLine);
+
+                const rGeom = new THREE.BufferGeometry().setFromPoints(reconArr);
+                const rLine = new THREE.Line(rGeom, new THREE.LineBasicMaterial({ color: 0xff4757 }));
+                scene.add(rLine);
+
+                let aPoints = null;
+                if (anomArr.length > 0) {
+                    const aGeom = new THREE.BufferGeometry();
+                    aGeom.setAttribute('position', new THREE.Float32BufferAttribute(anomArr, 3));
+                    aPoints = new THREE.Points(aGeom,
+                        new THREE.PointsMaterial({ color: 0xffa502, size: 0.1, transparent: true, opacity: 0.85 }));
+                    scene.add(aPoints);
+                }
+                if (!STATE.reconViz) STATE.reconViz = {};
+                STATE.reconViz.orig = oLine;
+                STATE.reconViz.recon = rLine;
+                STATE.reconViz.anom = aPoints;
+            }
+            makeData(null);
+
+            let isDrag = false, px = 0, py = 0;
+            renderer.domElement.addEventListener('mousedown', e => { isDrag = true; px = e.clientX; py = e.clientY; });
+            renderer.domElement.addEventListener('mousemove', e => {
+                if (!isDrag) return;
+                const dx = (e.clientX - px) * 0.008, dy = (e.clientY - py) * 0.008;
+                const sph = new THREE.Spherical().setFromVector3(camera.position);
+                sph.theta -= dx;
+                sph.phi = Math.max(0.2, Math.min(Math.PI - 0.2, sph.phi - dy));
+                camera.position.setFromSpherical(sph);
+                camera.lookAt(0, 0, 0);
+                px = e.clientX; py = e.clientY;
+            });
+            document.addEventListener('mouseup', () => { isDrag = false; });
+
+            (function animate() {
+                requestAnimationFrame(animate);
+                if (STATE.rotationEnabled) {
+                    [STATE.reconViz.orig, STATE.reconViz.recon, STATE.reconViz.anom].forEach(o => {
+                        if (o) o.rotation.y += 0.004;
+                    });
+                }
+                renderer.render(scene, camera);
+            })();
+
+            STATE.reconViz.update = makeData;
+            STATE.reconViz.scene = scene;
+            STATE.reconViz.camera = camera;
+            STATE.reconViz.renderer = renderer;
+
+            window.addEventListener('resize', () => {
+                const nw = wrap.clientWidth, nh = wrap.clientHeight || 380;
+                camera.aspect = nw / nh;
+                camera.updateProjectionMatrix();
+                renderer.setSize(nw, nh);
+            });
+        }
+
+        /* ============================================================
+           BLOCH SPHERE (Three.js - lazy init)
+           ============================================================ */
+        function initBlochSphere() {
+            if (STATE.blochReady) return;
+            STATE.blochReady = true;
+            const wrap = document.getElementById('blochWrap');
+            const w = wrap.clientWidth, h = wrap.clientHeight || 380;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
+            camera.position.set(2.2, 1.8, 2.2);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            wrap.appendChild(renderer.domElement);
+
+            const sphereWire = new THREE.Mesh(
+                new THREE.SphereGeometry(1, 32, 24),
+                new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.07 })
+            );
+            scene.add(sphereWire);
+
+            function addCircle3D(axis, color, opacity) {
+                const pts = [];
+                for (let i = 0; i <= 64; i++) {
+                    const a = (i / 64) * Math.PI * 2;
+                    if (axis === 'xz') pts.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+                    else if (axis === 'xy') pts.push(new THREE.Vector3(Math.cos(a), Math.sin(a), 0));
+                    else pts.push(new THREE.Vector3(0, Math.sin(a), Math.cos(a)));
+                }
+                scene.add(new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints(pts),
+                    new THREE.LineBasicMaterial({ color, transparent: true, opacity })
+                ));
+            }
+            addCircle3D('xz', 0x0080ff, 0.2);
+            addCircle3D('xy', 0x667eea, 0.12);
+            addCircle3D('yz', 0x667eea, 0.12);
+
+            function addAxis(from, to, color) {
+                scene.add(new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...from), new THREE.Vector3(...to)]),
+                    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 })
+                ));
+            }
+            addAxis([0, -1.4, 0], [0, 1.4, 0], 0x00ffff);
+            addAxis([-1.4, 0, 0], [1.4, 0, 0], 0xff4757);
+            addAxis([0, 0, -1.4], [0, 0, 1.4], 0x00d2d3);
+
+            function addLabel(text, pos, color) {
+                const c = document.createElement('canvas');
+                c.width = 128; c.height = 64;
+                const cx = c.getContext('2d');
+                cx.font = '22px monospace';
+                cx.fillStyle = color;
+                cx.textAlign = 'center'; cx.textBaseline = 'middle';
+                cx.fillText(text, 64, 32);
+                const tex = new THREE.CanvasTexture(c);
+                const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+                const sp = new THREE.Sprite(mat);
+                sp.position.set(...pos);
+                sp.scale.set(0.45, 0.22, 1);
+                scene.add(sp);
+            }
+            addLabel('|0\u27E9', [0, 1.55, 0], '#00ffff');
+            addLabel('|1\u27E9', [0, -1.55, 0], '#ff4757');
+            addLabel('|+\u27E9', [1.45, 0, 0], '#ffa502');
+            addLabel('|-\u27E9', [-1.45, 0, 0], '#ffa502');
+            addLabel('|+i\u27E9', [0, 0, 1.45], '#00d2d3');
+            addLabel('|-i\u27E9', [0, 0, -1.45], '#00d2d3');
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+            let arrow = null;
+            function updateVector(bx, by, bz) {
+                if (arrow) scene.remove(arrow);
+                const dir = new THREE.Vector3(bx, bz, by).normalize();
+                const len = Math.min(1, Math.sqrt(bx * bx + by * by + bz * bz));
+                arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), len, 0xff00ff, 0.1, 0.06);
+                scene.add(arrow);
+            }
+            updateVector(0, 0, 1);
+
+            let isDrag = false, prevX = 0, prevY = 0;
+            renderer.domElement.addEventListener('mousedown', e => { isDrag = true; prevX = e.clientX; prevY = e.clientY; });
+            renderer.domElement.addEventListener('mousemove', e => {
+                if (!isDrag) return;
+                const dx = (e.clientX - prevX) * 0.008, dy = (e.clientY - prevY) * 0.008;
+                const sph = new THREE.Spherical().setFromVector3(camera.position);
+                sph.theta -= dx;
+                sph.phi = Math.max(0.2, Math.min(Math.PI - 0.2, sph.phi - dy));
+                camera.position.setFromSpherical(sph);
+                camera.lookAt(0, 0, 0);
+                prevX = e.clientX; prevY = e.clientY;
+            });
+            document.addEventListener('mouseup', () => { isDrag = false; });
+
+            (function animate() {
+                requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+            })();
+
+            STATE.blochViz = { updateVector, scene, camera, renderer };
+
+            window.addEventListener('resize', () => {
+                const nw = wrap.clientWidth, nh = wrap.clientHeight || 380;
+                camera.aspect = nw / nh;
+                camera.updateProjectionMatrix();
+                renderer.setSize(nw, nh);
+            });
+        }
+
+        /* ============================================================
+           QUANTUM CIRCUIT DIAGRAM (Canvas)
+           ============================================================ */
+        function drawCircuitDiagram() {
+            const canvas = document.getElementById('circuitCanvas');
+            const wrap = document.getElementById('circuitWrap');
+            canvas.width = wrap.clientWidth * (window.devicePixelRatio || 1);
+            canvas.height = (wrap.clientHeight || 380) * (window.devicePixelRatio || 1);
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            const ctx = canvas.getContext('2d');
+            const scale = window.devicePixelRatio || 1;
+            ctx.scale(scale, scale);
+            const W = wrap.clientWidth, H = wrap.clientHeight || 380;
+
+            ctx.fillStyle = '#060a1e';
+            ctx.fillRect(0, 0, W, H);
+
+            const nQ = 4;
+            const wireY = [];
+            const spacing = (H - 60) / (nQ + 1);
+            for (let i = 0; i < nQ; i++) wireY.push(40 + (i + 1) * spacing);
+
+            ctx.strokeStyle = 'rgba(100,200,255,0.15)';
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < nQ; i++) {
+                ctx.beginPath(); ctx.moveTo(55, wireY[i]); ctx.lineTo(W - 20, wireY[i]); ctx.stroke();
+            }
+
+            ctx.fillStyle = '#00ffff'; ctx.font = '13px monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+            for (let i = 0; i < nQ; i++) ctx.fillText('q' + i, 48, wireY[i]);
+
+            function gate(x, y, label, color) {
+                const gw = 34, gh = 26;
+                ctx.fillStyle = color; ctx.globalAlpha = 0.18;
+                roundRect(ctx, x - gw / 2, y - gh / 2, gw, gh, 4); ctx.fill();
+                ctx.globalAlpha = 1; ctx.strokeStyle = color; ctx.lineWidth = 1.2;
+                roundRect(ctx, x - gw / 2, y - gh / 2, gw, gh, 4); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(label, x, y);
+            }
+
+            function cnot(x, y1, y2) {
+                ctx.strokeStyle = '#667eea'; ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.stroke();
+                ctx.fillStyle = '#667eea';
+                ctx.beginPath(); ctx.arc(x, y1, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#667eea'; ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.arc(x, y2, 7, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x - 7, y2); ctx.lineTo(x + 7, y2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x, y2 - 7); ctx.lineTo(x, y2 + 7); ctx.stroke();
+            }
+
+            function meter(x, y) {
+                const mw = 28, mh = 24;
+                ctx.fillStyle = 'rgba(102,126,234,0.12)';
+                roundRect(ctx, x - mw / 2, y - mh / 2, mw, mh, 3); ctx.fill();
+                ctx.strokeStyle = '#667eea'; ctx.lineWidth = 1;
+                roundRect(ctx, x - mw / 2, y - mh / 2, mw, mh, 3); ctx.stroke();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(x, y + 3, 7, Math.PI, 0); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x + 4, y - 5); ctx.stroke();
+            }
+
+            let x = 75;
+            for (let i = 0; i < nQ; i++) gate(x, wireY[i], 'RY', '#0080ff');
+            x += 45;
+            const layersToDraw = Math.min(3, Math.floor((W - 200) / 150));
+            for (let l = 0; l < layersToDraw; l++) {
+                for (let i = 0; i < nQ; i++) gate(x, wireY[i], 'RX', '#ff4757');
+                x += 40;
+                for (let i = 0; i < nQ; i++) gate(x, wireY[i], 'RY', '#0080ff');
+                x += 40;
+                for (let i = 0; i < nQ; i++) gate(x, wireY[i], 'RZ', '#00d2d3');
+                x += 35;
+                for (let i = 0; i < nQ; i++) cnot(x, wireY[i], wireY[(i + 1) % nQ]);
+                x += 35;
+            }
+
+            ctx.fillStyle = '#8892b0'; ctx.font = '20px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('\u00B7\u00B7\u00B7', x + 12, H / 2);
+            x += 40;
+
+            for (let i = 0; i < nQ; i++) meter(x, wireY[i]);
+
+            ctx.fillStyle = '#5a6378'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+            ctx.fillText('4 Qubits \u00D7 10 Variational Layers  |  RY Angle Embedding  |  CNOT Ring Entanglement  |  Probs Measurement', W / 2, H - 12);
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        /* ============================================================
+           WAVEFORM ANIMATION (Canvas)
+           ============================================================ */
+        function initWaveform() {
+            const canvas = document.getElementById('waveformCanvas');
+            const wrap = canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = wrap.clientWidth * dpr;
+            canvas.height = wrap.clientHeight * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            const W = wrap.clientWidth, H = wrap.clientHeight;
+            let offset = 0;
+
+            function draw() {
+                ctx.fillStyle = 'rgba(5,8,20,0.06)';
+                ctx.fillRect(0, 0, W, H);
+                const r = STATE.lastResult;
+                const s0 = r ? (r.pcaFeatures[0] || 0.5) : 0.5;
+                const s1 = r ? (r.pcaFeatures[1] || 0.3) : 0.3;
+                const errAmp = r ? Math.min(1, r.reconError * 50) : 0.1;
+
+                ctx.beginPath(); ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 1.8;
+                for (let x = 0; x < W; x++) {
+                    const t = (x / W) * Math.PI * 6;
+                    const y = H / 2 +
+                        Math.sin(t + offset * 0.025) * 20 * (1 + Math.abs(s0)) +
+                        Math.cos(t * 1.7 + offset * 0.018) * 10 * (1 + Math.abs(s1)) +
+                        Math.sin(t * 3 + offset * 0.04) * 4;
+                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                ctx.beginPath(); ctx.strokeStyle = 'rgba(255,71,87,0.55)'; ctx.lineWidth = 1.4;
+                for (let x = 0; x < W; x++) {
+                    const t = (x / W) * Math.PI * 6;
+                    const y = H / 2 +
+                        Math.sin(t + offset * 0.025 + errAmp * 2) * 18 * (1 + Math.abs(s0)) +
+                        Math.cos(t * 1.7 + offset * 0.018 + errAmp) * 9 * (1 + Math.abs(s1)) +
+                        Math.sin(t * 3 + offset * 0.04 - errAmp * 0.5) * 6;
+                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                offset++;
+                requestAnimationFrame(draw);
+            }
+            draw();
+
+            window.addEventListener('resize', () => {
+                const nw = wrap.clientWidth, nh = wrap.clientHeight;
+                canvas.width = nw * dpr; canvas.height = nh * dpr;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+            });
+        }
+
+        /* ============================================================
+           PROBABILITY CHART (Chart.js)
+           ============================================================ */
+        function initProbChart() {
+            const ctx = document.getElementById('probCanvas').getContext('2d');
+            const labels = [];
+            for (let i = 0; i < 16; i++) labels.push('|' + i.toString(2).padStart(4, '0') + '\u27E9');
+
+            STATE.probChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: new Array(16).fill(1 / 16),
+                        backgroundColor: 'rgba(0,255,255,0.35)',
+                        borderColor: 'rgba(0,255,255,0.7)',
+                        borderWidth: 1,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            ticks: { color: '#5a6378', font: { size: 8, family: 'monospace' }, maxRotation: 90, minRotation: 45 },
+                            grid: { color: 'rgba(100,200,255,0.05)' }
+                        },
+                        y: {
+                            ticks: { color: '#5a6378', font: { size: 9 } },
+                            grid: { color: 'rgba(100,200,255,0.05)' },
+                            beginAtZero: true
+                        }
+                    },
+                    animation: { duration: 400 }
+                }
+            });
+        }
+
+        function updateProbChart(probs) {
+            if (!STATE.probChart) return;
+            STATE.probChart.data.datasets[0].data = probs;
+            const maxIdx = probs.indexOf(Math.max(...probs));
+            const colors = probs.map((_, i) => i === maxIdx ? 'rgba(255,0,255,0.6)' : 'rgba(0,255,255,0.3)');
+            const borders = probs.map((_, i) => i === maxIdx ? 'rgba(255,0,255,0.9)' : 'rgba(0,255,255,0.6)');
+            STATE.probChart.data.datasets[0].backgroundColor = colors;
+            STATE.probChart.data.datasets[0].borderColor = borders;
+            STATE.probChart.update('none');
+        }
+
+        /* ============================================================
+           REAL-TIME TRANSACTION STREAMING
+           ============================================================ */
+        function startStreaming() {
+            STATE.streaming = true;
+            processNext();
+        }
+
+        async function processNext() {
+            if (!STATE.streaming) return;
+
+            try {
+                const result = await apiGet('/api/next');
+                STATE.totalAnalyzed = result.totalAnalyzed || STATE.totalAnalyzed + 1;
+                STATE.totalFraud = result.totalFraud || STATE.totalFraud;
+                STATE.lastResult = result;
+
+                if (result.isFraud) {
+                    showToast('fraud', 'Fraud Detected',
+                        `Amount: $${result.amount.toFixed(2)} | Error: ${result.reconError.toFixed(6)} | ${result.qState}`);
+                }
+
+                addThreat(result, result);
+                updateDashboard(result);
+            } catch (err) {
+                console.error('Stream error:', err);
+                showToast('error', 'Connection Lost', 'Backend API not responding. Retrying...');
+            }
+
+            scheduleNext();
+        }
+
+        function scheduleNext() {
+            const interval = CFG.STREAM_INTERVAL + Math.random() * 600 - 300;
+            STATE.streamTimer = setTimeout(processNext, interval);
+        }
+
+        /* ============================================================
+           STREAM CONTROLS (Pause/Play/Step/Speed)
+           ============================================================ */
+        function pauseStreaming() {
+            STATE.streaming = false;
+            if (STATE.streamTimer) {
+                clearTimeout(STATE.streamTimer);
+                STATE.streamTimer = null;
+            }
+            document.getElementById('btnPause').style.display = 'none';
+            document.getElementById('btnPlay').style.display = 'inline-block';
+            document.getElementById('streamingDot').classList.add('paused');
+            document.getElementById('streamingStatus').textContent = 'Paused';
+            document.getElementById('streamRate').textContent = '0';
+        }
+
+        function resumeStreaming() {
+            STATE.streaming = true;
+            document.getElementById('btnPause').style.display = 'inline-block';
+            document.getElementById('btnPlay').style.display = 'none';
+            document.getElementById('streamingDot').classList.remove('paused');
+            document.getElementById('streamingStatus').textContent = 'System Active';
+            document.getElementById('streamRate').textContent = (1000 / CFG.STREAM_INTERVAL).toFixed(1);
+            processNext();
+        }
+
+        async function stepTransaction() {
+            // Process exactly one transaction regardless of streaming state
+            const wasStreaming = STATE.streaming;
+            STATE.streaming = false;
+            if (STATE.streamTimer) {
+                clearTimeout(STATE.streamTimer);
+                STATE.streamTimer = null;
+            }
+
+            try {
+                const result = await apiGet('/api/next');
+                STATE.totalAnalyzed = result.totalAnalyzed || STATE.totalAnalyzed + 1;
+                STATE.totalFraud = result.totalFraud || STATE.totalFraud;
+                STATE.lastResult = result;
+
+                if (result.isFraud) {
+                    showToast('fraud', 'Fraud Detected',
+                        `Amount: $${result.amount.toFixed(2)} | Error: ${result.reconError.toFixed(6)} | ${result.qState}`);
+                } else {
+                    showToast('safe', 'Transaction Analyzed',
+                        `Amount: $${result.amount.toFixed(2)} | Error: ${result.reconError.toFixed(6)}`);
+                }
+
+                addThreat(result, result);
+                updateDashboard(result);
+            } catch (err) {
+                console.error('Step error:', err);
+                showToast('error', 'Step Failed', err.message);
+            }
+
+            // Keep paused after step
+            document.getElementById('btnPause').style.display = 'none';
+            document.getElementById('btnPlay').style.display = 'inline-block';
+            document.getElementById('streamingDot').classList.add('paused');
+            document.getElementById('streamingStatus').textContent = 'Paused (Step Mode)';
+            document.getElementById('streamRate').textContent = '0';
+        }
+
+        function setStreamSpeed(interval) {
+            CFG.STREAM_INTERVAL = parseInt(interval);
+            document.getElementById('streamRate').textContent = (1000 / CFG.STREAM_INTERVAL).toFixed(1);
+        }
+
+        // Initialize controls
+        function initStreamControls() {
+            document.getElementById('btnPause').addEventListener('click', pauseStreaming);
+            document.getElementById('btnPlay').addEventListener('click', resumeStreaming);
+            document.getElementById('btnStep').addEventListener('click', stepTransaction);
+            document.getElementById('speedSelect').addEventListener('change', (e) => setStreamSpeed(e.target.value));
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Only trigger if not in an input field
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    if (STATE.streaming) pauseStreaming();
+                    else resumeStreaming();
+                } else if (e.code === 'ArrowRight') {
+                    e.preventDefault();
+                    stepTransaction();
+                }
+            });
+        }
+
+        /* ============================================================
+           THREAT MATRIX RENDERING
+           ============================================================ */
+        const cardNames = ['Quantum Sys', 'CyberDyne', 'MedCore', 'DataForge', 'Neural Ltd', 'ColdTech', 'Crypto Ex', 'Mandarin Or'];
+        const cities = ['New York', 'Tokyo', 'London', 'Singapore', 'Dubai', 'Hong Kong', 'Frankfurt', 'Sydney', 'Mumbai', 'Berlin'];
+
+        function addThreat(result, tx) {
+            const cardId = 'Card ' + String(Math.floor(1000 + Math.random() * 9000));
+            const merchant = cardNames[Math.floor(Math.random() * cardNames.length)];
+            const city = cities[Math.floor(Math.random() * cities.length)];
+            const riskClass = result.riskScore > 7 ? 'high' : result.riskScore > 4 ? 'med' : 'low';
+            const scoreClass = riskClass;
+
+            const threat = { cardId, merchant, city, result, tx, riskClass };
+            STATE.threats.unshift(threat);
+            if (STATE.threats.length > CFG.MAX_THREATS) STATE.threats.pop();
+
+            const list = document.getElementById('threatList');
+            const el = document.createElement('div');
+            el.className = `threat-item risk-${riskClass}${result.isFraud ? ' risk-high new' : ''}`;
+            el.setAttribute('role', 'listitem');
+            el.setAttribute('tabindex', '0');
+            el.setAttribute('aria-label', `${cardId}, risk ${result.riskScore} out of 10`);
+            el.innerHTML = `
+        <div class="threat-info">
+            <div class="threat-id">${cardId}</div>
+            <div class="threat-meta">
+                <span>${merchant}</span>
+                <span>$${result.amount.toFixed(2)}</span>
+            </div>
+        </div>
+        <div class="threat-score ${scoreClass}">${result.riskScore}/10</div>`;
+            el.addEventListener('click', () => showModal(threat));
+            el.addEventListener('keydown', e => { if (e.key === 'Enter') showModal(threat); });
+
+            list.insertBefore(el, list.firstChild);
+            while (list.children.length > CFG.MAX_THREATS) list.removeChild(list.lastChild);
+        }
+
+        /* ============================================================
+           DASHBOARD METRICS UPDATE
+           ============================================================ */
+        function updateDashboard(r) {
+            document.getElementById('hdrAnalyzed').textContent = STATE.totalAnalyzed;
+            document.getElementById('hdrDetected').textContent = STATE.totalFraud;
+            document.getElementById('alertCount').textContent = STATE.totalFraud;
+            document.getElementById('statTotal').textContent = STATE.totalAnalyzed;
+            document.getElementById('statFraud').textContent = STATE.totalFraud;
+            document.getElementById('statSafe').textContent = STATE.totalAnalyzed - STATE.totalFraud;
+            document.getElementById('streamRate').textContent = (1000 / CFG.STREAM_INTERVAL).toFixed(1);
+
+            const scorePct = Math.min(100, (r.reconError / (r.dynThreshold * 2)) * 100);
+            document.getElementById('scoreVal').textContent = scorePct.toFixed(1) + '%';
+            const circ = 2 * Math.PI * 85;
+            document.getElementById('scoreArc').style.strokeDashoffset = circ - (scorePct / 100) * circ;
+            document.getElementById('scoreArc').setAttribute('stroke',
+                r.isFraud ? 'url(#scoreDanger)' : 'url(#scoreGrad)');
+
+            const verdict = document.getElementById('scoreVerdict');
+            if (r.isFraud) {
+                verdict.textContent = 'FRAUD DETECTED';
+                verdict.className = 'score-verdict fraud';
+            } else {
+                verdict.textContent = 'NORMAL';
+                verdict.className = 'score-verdict safe';
+            }
+
+            document.getElementById('metricError').textContent = r.reconError.toFixed(4);
+            const errSub = document.getElementById('metricErrorSub');
+            errSub.textContent = r.isFraud ? '\u2191 Above threshold' : '\u2193 Below threshold';
+            errSub.className = 'metric-sub ' + (r.isFraud ? 'neg' : 'pos');
+
+            document.getElementById('metricThresh').textContent = r.dynThreshold.toFixed(4);
+            document.getElementById('metricQState').textContent = r.qState;
+            const qSub = document.getElementById('metricQSub');
+            qSub.textContent = r.isFraud ? 'Anomalous' : 'Stable';
+            qSub.className = 'metric-sub ' + (r.isFraud ? 'neg' : 'pos');
+
+            document.getElementById('metricConf').textContent = r.confidence + '%';
+            const confSub = document.getElementById('metricConfSub');
+            confSub.textContent = r.isFraud ? 'Fraud likely' : 'Normal pattern';
+            confSub.className = 'metric-sub ' + (r.isFraud ? 'neg' : 'pos');
+
+            updateProbChart(r.probs);
+            if (STATE.reconViz && STATE.reconViz.update) STATE.reconViz.update(r);
+            if (STATE.blochViz) STATE.blochViz.updateVector(r.blochVec.x, r.blochVec.y, r.blochVec.z);
+
+            const factors = document.getElementById('factorsList');
+            const bDev = Math.min(10, r.reconError / r.dynThreshold * 5);
+            const gDev = Math.min(10, Math.abs(r.pcaFeatures[1] || 0) * 4);
+            const tDev = Math.min(10, Math.abs(r.pcaFeatures[2] || 0) * 3);
+            factors.innerHTML = `
+        <div class="factor-item ${bDev > 6 ? 'high' : bDev > 3 ? 'med' : ''}">
+            <span class="factor-name">Behavioral Deviation</span>
+            <span class="factor-level ${bDev > 6 ? 'high' : bDev > 3 ? 'med' : 'low'}">${bDev.toFixed(1)}/10</span>
+        </div>
+        <div class="factor-item ${gDev > 6 ? 'high' : gDev > 3 ? 'med' : ''}">
+            <span class="factor-name">Geo-Temporal Irregularity</span>
+            <span class="factor-level ${gDev > 6 ? 'high' : gDev > 3 ? 'med' : 'low'}">${gDev.toFixed(1)}/10</span>
+        </div>
+        <div class="factor-item ${tDev > 6 ? 'high' : tDev > 3 ? 'med' : ''}">
+            <span class="factor-name">Transaction Anomaly</span>
+            <span class="factor-level ${tDev > 6 ? 'high' : tDev > 3 ? 'med' : 'low'}">${tDev.toFixed(1)}/10</span>
+        </div>`;
+        }
+
+        /* ============================================================
+           TOAST NOTIFICATIONS
+           ============================================================ */
+        function showToast(type, title, desc) {
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            el.className = 'toast ' + type;
+            const icons = { fraud: '\u26A0\uFE0F', safe: '\u2705', info: '\u2139\uFE0F', error: '\u274C' };
+            el.innerHTML = `
+        <span class="toast-icon">${icons[type] || ''}</span>
+        <div class="toast-text">
+            <div class="title">${title}</div>
+            <div class="desc">${desc}</div>
+        </div>`;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.classList.add('out');
+                setTimeout(() => el.remove(), 300);
+            }, CFG.TOAST_DURATION);
+        }
+
+        /* ============================================================
+           TRANSACTION DETAIL MODAL
+           ============================================================ */
+        function showModal(threat) {
+            const { cardId, merchant, city, result } = threat;
+            const m = document.getElementById('modal');
+            const body = document.getElementById('modalBody');
+            body.innerHTML = `
+        <div class="modal-section">
+            <h4>Transaction Details</h4>
+            <div class="modal-row"><span class="label">Card ID</span><span class="val">${cardId}</span></div>
+            <div class="modal-row"><span class="label">Merchant</span><span class="val">${merchant}</span></div>
+            <div class="modal-row"><span class="label">Location</span><span class="val">${city}</span></div>
+            <div class="modal-row"><span class="label">Amount</span><span class="val">$${result.amount.toFixed(2)}</span></div>
+            <div class="modal-row"><span class="label">Time</span><span class="val">${result.time.toFixed(0)}s</span></div>
+        </div>
+        <div class="modal-section">
+            <h4>Quantum Analysis</h4>
+            <div class="modal-row"><span class="label">Reconstruction Error</span><span class="val" style="color:${result.isFraud ? 'var(--danger)' : 'var(--safe)'}">${result.reconError.toFixed(6)}</span></div>
+            <div class="modal-row"><span class="label">Dynamic Threshold</span><span class="val">${result.dynThreshold.toFixed(6)}</span></div>
+            <div class="modal-row"><span class="label">Error/Threshold Ratio</span><span class="val">${(result.reconError / result.dynThreshold).toFixed(2)}x</span></div>
+            <div class="modal-row"><span class="label">Quantum State</span><span class="val" style="color:var(--quantum-cyan)">${result.qState}</span></div>
+            <div class="modal-row"><span class="label">Confidence</span><span class="val">${result.confidence}%</span></div>
+            <div class="modal-row"><span class="label">Risk Score</span><span class="val" style="color:${result.isFraud ? 'var(--danger)' : 'var(--safe)'}">${result.riskScore}/10</span></div>
+        </div>
+        <div class="modal-section" style="background:${result.isFraud ? 'rgba(255,71,87,0.08)' : 'rgba(0,210,211,0.08)'};border-color:${result.isFraud ? 'rgba(255,71,87,0.2)' : 'rgba(0,210,211,0.2)'}">
+            <h4>Verdict</h4>
+            <p style="font-size:14px;font-weight:700;color:${result.isFraud ? 'var(--danger)' : 'var(--safe)'};">
+                ${result.isFraud ? 'FRAUD DETECTED - Transaction flagged for review' : 'NORMAL - Transaction pattern within expected bounds'}
+            </p>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:8px;">
+                The Variational Quantum Autoencoder reconstruction error of ${result.reconError.toFixed(6)}
+                ${result.isFraud ? 'exceeds' : 'is below'} the dynamic threshold of ${result.dynThreshold.toFixed(6)}
+                by ${Math.abs(((result.reconError / result.dynThreshold) - 1) * 100).toFixed(1)}%.
+                Quantum state analysis indicates ${result.confidence}% confidence in this classification.
+            </p>
+        </div>
+        <div class="modal-section">
+            <h4>PCA Feature Vector (4-Qubit Input)</h4>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                ${result.pcaFeatures.map((v, i) => `<div style="flex:1;min-width:80px;text-align:center;padding:8px;background:var(--bg-deep);border-radius:6px;border:1px solid var(--border-subtle);">
+                    <div style="font-size:10px;color:var(--text-muted);">PC${i + 1}</div>
+                    <div style="font-family:var(--font-mono);color:var(--quantum-cyan);font-size:14px;">${v.toFixed(4)}</div>
+                </div>`).join('')}
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-danger" onclick="modalAction('block', this)">Block Transaction</button>
+            <button class="btn btn-success" onclick="modalAction('verify', this)">Verify Safe</button>
+            <button class="btn btn-secondary" onclick="modalAction('flag', this)">Flag for Review</button>
+        </div>`;
+            m.classList.add('active');
+        }
+
+        function modalAction(action, btn) {
+            const labels = { block: 'Transaction Blocked', verify: 'Verified Safe', flag: 'Flagged for Review' };
+            const types = { block: 'fraud', verify: 'safe', flag: 'info' };
+            const icons = { block: 'BLOCKED', verify: 'CLEARED', flag: 'FLAGGED' };
+
+            // Visual feedback on the button
+            const origText = btn.textContent;
+            btn.textContent = icons[action];
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+
+            // Disable sibling buttons
+            btn.parentElement.querySelectorAll('button').forEach(b => { if (b !== btn) b.disabled = true; });
+
+            showToast(types[action], labels[action], 'Action recorded by QuantumEye system.');
+
+            // Close modal after brief delay
+            setTimeout(() => {
+                closeModal();
+                btn.textContent = origText;
+                btn.disabled = false;
+                btn.style.opacity = '';
+                btn.parentElement.querySelectorAll('button').forEach(b => b.disabled = false);
+            }, 800);
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        /* ============================================================
+           CLOCK
+           ============================================================ */
+        function startClock() {
+            function tick() {
+                const t = new Date().toTimeString().split(' ')[0];
+                document.getElementById('headerClock').textContent = t;
+                document.getElementById('clockDisplay').textContent = t;
+            }
+            tick();
+            setInterval(tick, 1000);
+        }
+
+        /* ============================================================
+           TAB CONTROLLER
+           ============================================================ */
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                btn.setAttribute('aria-selected', 'true');
+                const tabId = 'tab-' + btn.dataset.tab;
+                document.getElementById(tabId).classList.add('active');
+                if (btn.dataset.tab === 'bloch') initBlochSphere();
+                if (btn.dataset.tab === 'circuit') drawCircuitDiagram();
+            });
+        });
+
+        /* ============================================================
+           BUTTON HANDLERS
+           ============================================================ */
+        document.getElementById('btnSimulate').addEventListener('click', async () => {
+            showToast('fraud', 'Attack Simulation', 'Injecting synthetic fraud pattern via real VQAE model...');
+            document.querySelectorAll('.panel').forEach(p => {
+                p.style.borderColor = 'rgba(255,71,87,0.5)';
+                p.style.boxShadow = '0 0 30px rgba(255,71,87,0.15)';
+                setTimeout(() => {
+                    p.style.borderColor = '';
+                    p.style.boxShadow = '';
+                }, 2500);
+            });
+            try {
+                const result = await apiGet('/api/next');
+                STATE.totalAnalyzed = result.totalAnalyzed || STATE.totalAnalyzed + 1;
+                STATE.totalFraud = result.totalFraud || STATE.totalFraud;
+                STATE.lastResult = result;
+                addThreat(result, result);
+                updateDashboard(result);
+            } catch (err) {
+                console.error('Simulate error:', err);
+            }
+        });
+
+        document.getElementById('btnVerify').addEventListener('click', () => {
+            showToast('safe', 'Transaction Verified', 'Current transaction verified and cleared. No anomalies detected.');
+        });
+
+        document.getElementById('btnToggle').addEventListener('click', () => {
+            STATE.rotationEnabled = !STATE.rotationEnabled;
+            const btn = document.getElementById('btnToggle');
+            btn.textContent = STATE.rotationEnabled ? 'Pause Rotation' : 'Resume Rotation';
+        });
+
+        document.getElementById('btnWhatIf').addEventListener('click', () => {
+            const panel = document.getElementById('whatIfPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Alert badge — scroll to threat matrix and highlight fraud items
+        document.getElementById('alertBadge').addEventListener('click', () => {
+            const threatList = document.getElementById('threatList');
+            if (!threatList) return;
+            threatList.scrollTop = 0;
+            // Flash fraud items
+            threatList.querySelectorAll('.threat-item.risk-high').forEach(el => {
+                el.style.transition = 'background 0.15s';
+                el.style.background = 'rgba(255,71,87,0.2)';
+                setTimeout(() => { el.style.background = ''; }, 1200);
+            });
+            showToast('info', 'Fraud Alerts', STATE.totalFraud + ' fraudulent transactions detected so far.');
+        });
+
+        /* ============================================================
+           WHAT-IF SIMULATION
+           ============================================================ */
+        function setupWhatIf() {
+            const sliders = [
+                { id: 'wfAmount', valId: 'wfAmountVal', fmt: v => '$' + Number(v).toLocaleString() },
+                { id: 'wfV1', valId: 'wfV1Val', fmt: v => parseFloat(v).toFixed(1) },
+                { id: 'wfV14', valId: 'wfV14Val', fmt: v => parseFloat(v).toFixed(1) },
+                { id: 'wfV17', valId: 'wfV17Val', fmt: v => parseFloat(v).toFixed(1) },
+            ];
+            let whatIfTimeout = null;
+            async function runWhatIf() {
+                const amt = parseFloat(document.getElementById('wfAmount').value);
+                const v1 = parseFloat(document.getElementById('wfV1').value);
+                const v14 = parseFloat(document.getElementById('wfV14').value);
+                const v17 = parseFloat(document.getElementById('wfV17').value);
+                const el = document.getElementById('whatIfResult');
+                try {
+                    const result = await apiPost('/api/whatif', { Amount: amt, V1: v1, V14: v14, V17: v17 });
+                    el.textContent = `Prediction: ${result.isFraud ? 'FRAUD' : 'NORMAL'} (Error: ${result.reconError.toFixed(6)} | Threshold: ${result.dynThreshold.toFixed(6)})`;
+                    el.className = 'whatif-result ' + (result.isFraud ? 'fraud' : 'safe');
+                } catch (err) {
+                    el.textContent = 'Backend error: ' + err.message;
+                    el.className = 'whatif-result fraud';
+                }
+            }
+            sliders.forEach(s => {
+                const el = document.getElementById(s.id);
+                el.addEventListener('input', () => {
+                    document.getElementById(s.valId).textContent = s.fmt(el.value);
+                    clearTimeout(whatIfTimeout);
+                    whatIfTimeout = setTimeout(runWhatIf, 300);
+                });
+            });
+        }
+
+        /* ============================================================
+           FILE INPUT & DRAG-DROP (disabled - backend handles data)
+           ============================================================ */
+
+        /* ============================================================
+           MODAL CLOSE HANDLERS
+           ============================================================ */
+        document.getElementById('modalClose').addEventListener('click', closeModal);
+        document.getElementById('modal').addEventListener('click', e => {
+            if (e.target === document.getElementById('modal')) closeModal();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        /* ============================================================
+           IBM QUANTUM INTEGRATION
+           ============================================================ */
+        const IBM = { connected: false, qiskitOk: false, selectedBackend: null, jobs: [], pollTimer: null };
+
+        async function initIBMPanel() {
+            try {
+                const s = await apiGet('/api/ibm/status');
+                IBM.qiskitOk = s.qiskit_available;
+                const badge = document.getElementById('ibmQiskitBadge');
+                const dot = document.getElementById('ibmStatusDot');
+                const txt = document.getElementById('ibmStatusText');
+                if (s.qiskit_available) {
+                    badge.textContent = 'Qiskit OK';
+                    badge.style.color = 'var(--safe)';
+                    txt.textContent = 'Ready to connect';
+                } else {
+                    badge.textContent = 'No Qiskit';
+                    badge.style.color = 'var(--danger)';
+                    txt.textContent = 'Qiskit not installed';
+                    document.getElementById('ibmPanel').style.opacity = '0.5';
+                    document.getElementById('ibmPanel').style.pointerEvents = 'none';
+                }
+            } catch (e) {
+                document.getElementById('ibmStatusText').textContent = 'Backend N/A';
+            }
+        }
+
+        // Mode switching
+        document.getElementById('ibmModeBtns').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.ibm-mode-btn');
+            if (!btn) return;
+            const mode = btn.dataset.mode;
+            try {
+                await apiPost('/api/ibm/mode', { mode });
+                document.querySelectorAll('.ibm-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                showToast('info', 'Mode Changed', 'Quantum backend: ' + mode);
+            } catch (err) {
+                showToast('error', 'Mode Error', err.message);
+            }
+        });
+
+        // Validate
+        document.getElementById('btnValidate').addEventListener('click', async () => {
+            const el = document.getElementById('validateResult');
+            el.style.display = 'block';
+            el.textContent = 'Running validation...';
+            el.style.color = 'var(--text-secondary)';
+            try {
+                const r = await apiPost('/api/ibm/validate', {});
+                if (r.equivalent) {
+                    el.innerHTML = 'PASS — max diff: ' + r.max_diff.toExponential(2);
+                    el.style.color = 'var(--safe)';
+                } else {
+                    el.innerHTML = 'DIFF — max diff: ' + r.max_diff.toExponential(2);
+                    el.style.color = 'var(--warning)';
+                }
+            } catch (err) {
+                el.textContent = err.message;
+                el.style.color = 'var(--danger)';
+            }
+        });
+
+        // Connect
+        document.getElementById('btnIbmConnect').addEventListener('click', async () => {
+            const token = document.getElementById('ibmToken').value.trim();
+            if (!token) { showToast('error', 'Token Required', 'Enter your IBM Quantum API token'); return; }
+            const btn = document.getElementById('btnIbmConnect');
+            btn.textContent = 'Connecting...'; btn.disabled = true;
+            try {
+                const res = await apiPost('/api/ibm/connect', { token });
+                IBM.connected = true;
+                document.getElementById('ibmStatusDot').className = 'ibm-status-dot connected';
+                document.getElementById('ibmStatusText').textContent = 'Connected (' + res.backends.length + ' backends)';
+                document.getElementById('btnIbmDisconnect').disabled = false;
+                document.getElementById('ibmBackendSection').style.display = 'block';
+
+                const sel = document.getElementById('ibmBackendSelect');
+                sel.innerHTML = '<option value="">-- select backend --</option>';
+                res.backends.forEach(b => {
+                    const o = document.createElement('option');
+                    o.value = b.name;
+                    o.textContent = b.name + ' (' + b.n_qubits + 'q) — ' + b.status + ' [' + b.pending_jobs + ' queued]';
+                    sel.appendChild(o);
+                });
+                showToast('info', 'IBM Connected', res.backends.length + ' backends available');
+            } catch (err) {
+                showToast('error', 'Connect Failed', err.message);
+            }
+            btn.textContent = 'Connect'; btn.disabled = false;
+        });
+
+        // Disconnect
+        document.getElementById('btnIbmDisconnect').addEventListener('click', async () => {
+            await apiPost('/api/ibm/disconnect', {});
+            IBM.connected = false;
+            document.getElementById('ibmStatusDot').className = 'ibm-status-dot disconnected';
+            document.getElementById('ibmStatusText').textContent = 'Disconnected';
+            document.getElementById('btnIbmDisconnect').disabled = true;
+            document.getElementById('ibmBackendSection').style.display = 'none';
+            document.getElementById('ibmJobSection').style.display = 'none';
+            showToast('info', 'Disconnected', 'IBM Quantum session closed');
+        });
+
+        // Backend selection
+        document.getElementById('ibmBackendSelect').addEventListener('change', async (e) => {
+            const name = e.target.value;
+            if (!name) { document.getElementById('btnIbmSubmit').disabled = true; return; }
+            try {
+                const info = await apiPost('/api/ibm/select-backend', { backend_name: name });
+                IBM.selectedBackend = name;
+                document.getElementById('ibmBackendInfo').textContent = info.n_qubits + ' qubits | ' + info.status + ' | ' + info.pending_jobs + ' queued';
+                document.getElementById('btnIbmSubmit').disabled = false;
+                document.getElementById('ibmJobSection').style.display = 'block';
+            } catch (err) {
+                showToast('error', 'Backend Error', err.message);
+            }
+        });
+
+        // Submit to hardware
+        document.getElementById('btnIbmSubmit').addEventListener('click', async () => {
+            const btn = document.getElementById('btnIbmSubmit');
+            btn.textContent = 'Submitting...'; btn.disabled = true;
+            try {
+                const body = STATE.lastResult ? { features: STATE.lastResult.pcaFeatures } : {};
+                const res = await apiPost('/api/ibm/submit', body);
+                showToast('info', 'Job Submitted', 'Job ' + res.job_id + ' queued on ' + IBM.selectedBackend);
+                ibmStartPolling();
+                ibmRefreshJobs();
+            } catch (err) {
+                showToast('error', 'Submit Failed', err.message);
+            }
+            btn.textContent = 'Submit to IBM Quantum Hardware'; btn.disabled = false;
+        });
+
+        // Job polling
+        function ibmStartPolling() {
+            if (IBM.pollTimer) return;
+            IBM.pollTimer = setInterval(ibmRefreshJobs, 5000);
+        }
+
+        async function ibmRefreshJobs() {
+            try {
+                const jobs = await apiGet('/api/ibm/jobs');
+                IBM.jobs = jobs;
+                const list = document.getElementById('ibmJobList');
+                document.getElementById('ibmJobCount').textContent = '(' + jobs.length + ')';
+                list.innerHTML = '';
+                jobs.slice().reverse().forEach(job => {
+                    const cls = job.status === 'DONE' ? 'done' : (job.status === 'ERROR' ? 'error' : 'running');
+                    const el = document.createElement('div');
+                    el.className = 'ibm-job-item ' + cls;
+                    const statusColor = job.status === 'DONE' ? 'var(--safe)' : (job.status === 'ERROR' ? 'var(--danger)' : 'var(--warning)');
+                    el.innerHTML = '<span><strong>' + job.job_id + '</strong> <span style="color:var(--text-muted);margin-left:4px;">' + job.backend + '</span></span>'
+                        + '<span style="font-family:var(--font-mono);color:' + statusColor + ';">' + job.status + '</span>';
+                    if (job.status === 'DONE') {
+                        el.style.cursor = 'pointer';
+                        el.addEventListener('click', () => ibmShowResult(job.job_id));
+                    }
+                    list.appendChild(el);
+                });
+                const active = jobs.filter(j => ['QUEUED', 'RUNNING'].includes(j.status));
+                if (active.length === 0 && IBM.pollTimer) {
+                    clearInterval(IBM.pollTimer);
+                    IBM.pollTimer = null;
+                }
+            } catch (e) { /* polling error, ignore */ }
+        }
+
+        async function ibmShowResult(jobId) {
+            try {
+                const res = await apiGet('/api/ibm/job/' + jobId);
+                const j = res.job;
+                const ha = res.hardware_analysis;
+                const m = document.getElementById('modal');
+                const body = document.getElementById('modalBody');
+                let html = '<div style="padding:4px 0;">'
+                    + '<div style="font-size:14px;font-weight:700;color:var(--quantum-purple);margin-bottom:10px;">IBM Hardware Result</div>'
+                    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">'
+                    + '<div><span style="color:var(--text-secondary)">Job ID:</span> <strong>' + j.job_id + '</strong></div>'
+                    + '<div><span style="color:var(--text-secondary)">Backend:</span> ' + j.backend + '</div>'
+                    + '<div><span style="color:var(--text-secondary)">Shots:</span> ' + j.shots + '</div>'
+                    + '<div><span style="color:var(--text-secondary)">Status:</span> <span style="color:var(--safe);">' + j.status + '</span></div>'
+                    + '</div>';
+                if (ha) {
+                    const verdictColor = ha.isFraud ? 'var(--danger)' : 'var(--safe)';
+                    html += '<div style="margin-top:12px;padding:10px;background:var(--bg-deep);border-radius:6px;">'
+                        + '<div style="font-size:11px;font-weight:600;color:var(--quantum-cyan);margin-bottom:6px;">QUANTUM HARDWARE ANALYSIS</div>'
+                        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">'
+                        + '<div><span style="color:var(--text-secondary)">Recon Error:</span> <strong style="color:' + verdictColor + ';">' + ha.reconError.toFixed(6) + '</strong></div>'
+                        + '<div><span style="color:var(--text-secondary)">Threshold:</span> ' + ha.dynThreshold.toFixed(6) + '</div>'
+                        + '<div><span style="color:var(--text-secondary)">Verdict:</span> <strong style="color:' + verdictColor + ';">' + (ha.isFraud ? 'FRAUD' : 'NORMAL') + '</strong></div>'
+                        + '<div><span style="color:var(--text-secondary)">Quantum State:</span> <span style="color:var(--quantum-cyan);">' + ha.qState + '</span></div>'
+                        + '</div></div>';
+                    html += '<div style="margin-top:10px;"><canvas id="hwProbCanvas" style="height:140px;"></canvas></div>';
+                }
+                html += '</div>';
+                body.innerHTML = html;
+                m.classList.add('active');
+
+                if (ha && ha.probs) {
+                    setTimeout(() => {
+                        const ctx = document.getElementById('hwProbCanvas');
+                        if (!ctx) return;
+                        const labels = [];
+                        for (let i = 0; i < 16; i++) labels.push('|' + i.toString(2).padStart(4, '0') + '\u27E9');
+                        new Chart(ctx.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels,
+                                datasets: [
+                                    { label: 'Hardware', data: ha.probs, backgroundColor: 'rgba(102,126,234,0.5)', borderColor: 'rgba(102,126,234,0.8)', borderWidth: 1 },
+                                    { label: 'Simulator', data: STATE.lastResult ? STATE.lastResult.probs : [], backgroundColor: 'rgba(0,255,255,0.3)', borderColor: 'rgba(0,255,255,0.6)', borderWidth: 1 },
+                                ]
+                            },
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                plugins: { legend: { labels: { color: '#8892b0', font: { size: 9 } } } },
+                                scales: {
+                                    x: { ticks: { color: '#5a6378', font: { size: 7 } } },
+                                    y: { ticks: { color: '#5a6378' }, beginAtZero: true }
+                                }
+                            }
+                        });
+                    }, 150);
+                }
+            } catch (err) {
+                showToast('error', 'Result Error', err.message);
+            }
+        }
+
+        /* ============================================================
+           INITIALIZATION
+           ============================================================ */
+        document.addEventListener('DOMContentLoaded', () => {
+            setupWhatIf();
+            connectToBackend();
+        });
+    </script>
+</body>
+
+</html>

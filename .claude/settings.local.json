@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(tree:*)",
+      "Bash(start \"\" \"D:\\\\QI_AQVH_Final\\\\interface.html\")",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(curl:*)",
+      "Bash(findstr:*)",
+      "Bash(start \"\" \"http://localhost:5000\")",
+      "Bash(powershell:*)",
+      "WebSearch"
+    ]
+  }
+}

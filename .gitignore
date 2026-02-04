@@ -1,0 +1,39 @@
+# Data files (too large for git)
+creditcard.csv
+*.csv
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Environment
+.env
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Model files (large)
+*.pth
+*.pkl
+qdt_fraud_model/
+qdt_fraud_model_.pth/
+*.zip
+
+# System
+.DS_Store
+Thumbs.db
+nul
+
+# Temporary
+*.log
+*.tmp
+
+# Shortcuts
+*.lnk
