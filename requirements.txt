@@ -5,7 +5,4 @@ pandas==2.3.3
 scikit-learn==1.8.0
 gunicorn==23.0.0
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.6.0+cpu
-qiskit==2.2.1
-qiskit-aer==0.17.2
-qiskit-ibm-runtime==0.45.0
+torch==2.6.0
