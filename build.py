@@ -2,7 +2,7 @@
 Build script for Render deployment.
 1. Decompress creditcard.csv.gz if needed
 2. Preprocess data (subsample, fit scaler/PCA, build stream queue)
-3. Save preprocessed files so the app never loads the full CSV at runtime
+3. Save preprocessed pipeline.pkl (model_weights.npz is committed to git)
 """
 import gzip
 import os
@@ -96,36 +96,4 @@ with open(os.path.join(PREPROCESS_DIR, "pipeline.pkl"), "wb") as f:
 
 size_mb = os.path.getsize(os.path.join(PREPROCESS_DIR, "pipeline.pkl")) / 1024 / 1024
 print(f"\n[Preprocess] Saved preprocessed data ({size_mb:.1f} MB)")
-
-# ── Step 4: Convert model weights from torch to numpy ──
-print("\n[Model] Converting torch weights to numpy...")
-import torch
-import warnings
-
-MODEL_DIR = "qdt_fraud_model"
-pkl_path = os.path.join(MODEL_DIR, "data.pkl")
-
-class _Loader(pickle.Unpickler):
-    def persistent_load(self, saved_id):
-        _tag, _cls, key, _loc, numel = saved_id
-        fpath = os.path.join(MODEL_DIR, "data", str(key))
-        nbytes = int(numel) * 4
-        storage = torch.UntypedStorage.from_file(fpath, shared=False, nbytes=nbytes)
-        return torch.storage.TypedStorage(wrap_storage=storage, dtype=torch.float32)
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    with open(pkl_path, "rb") as f:
-        sd = _Loader(f).load()
-
-weights_np = {}
-for k, v in sd.items():
-    if isinstance(v, torch.Tensor):
-        weights_np[k] = v.numpy()
-        print(f"  {k}: {v.shape}")
-
-np.savez(os.path.join(PREPROCESS_DIR, "model_weights.npz"), **weights_np)
-size_mb2 = os.path.getsize(os.path.join(PREPROCESS_DIR, "model_weights.npz")) / 1024 / 1024
-print(f"  Saved model weights as numpy ({size_mb2:.2f} MB)")
-
-print("\n[Build] Done. No torch or pandas needed at runtime.")
+print("[Build] Done.")
