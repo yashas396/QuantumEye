@@ -8,7 +8,6 @@ Architecture:
 
 import os, json, math, time, threading, pickle
 import numpy as np
-import torch
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -91,28 +90,10 @@ for q in range(N_QUBITS):
 
 # ─── Load Model Weights ─────────────────────────────────────────────
 def load_model_weights():
-    """Load the state dict from the loose-file torch save format."""
-    pkl_path = os.path.join(MODEL_DIR, "data.pkl")
-    data_dir = MODEL_DIR
-
-    class _Loader(pickle.Unpickler):
-        def persistent_load(self, saved_id):
-            _tag, _cls, key, _loc, numel = saved_id
-            fpath = os.path.join(data_dir, "data", str(key))
-            nbytes = int(numel) * 4  # float32 = 4 bytes
-            storage = torch.UntypedStorage.from_file(fpath, shared=False, nbytes=nbytes)
-            return torch.storage.TypedStorage(wrap_storage=storage, dtype=torch.float32)
-
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        with open(pkl_path, "rb") as f:
-            sd = _Loader(f).load()
-
-    weights = {}
-    for k, v in sd.items():
-        if isinstance(v, torch.Tensor):
-            weights[k] = v
+    """Load pre-converted numpy weights (converted from torch at build time)."""
+    weights_path = os.path.join(BASE_DIR, "preprocessed", "model_weights.npz")
+    data = np.load(weights_path)
+    weights = {k: data[k] for k in data.files}
     return weights
 
 
@@ -123,11 +104,11 @@ class QDTFraudModel:
     """
 
     def __init__(self, weights):
-        self.params = weights["params"].numpy()          # (10, 4, 3)
-        self.fc_in_w = weights["fc_in.weight"].numpy()   # (4, 4)
-        self.fc_in_b = weights["fc_in.bias"].numpy()     # (4,)
-        self.fc_out_w = weights["fc_out.weight"].numpy()  # (4, 16)
-        self.fc_out_b = weights["fc_out.bias"].numpy()    # (4,)
+        self.params = weights["params"]                   # (10, 4, 3)
+        self.fc_in_w = weights["fc_in.weight"]            # (4, 4)
+        self.fc_in_b = weights["fc_in.bias"]              # (4,)
+        self.fc_out_w = weights["fc_out.weight"]          # (4, 16)
+        self.fc_out_b = weights["fc_out.bias"]            # (4,)
         print(f"  [Model] params: {self.params.shape}")
         print(f"  [Model] fc_in:  {self.fc_in_w.shape} + bias {self.fc_in_b.shape}")
         print(f"  [Model] fc_out: {self.fc_out_w.shape} + bias {self.fc_out_b.shape}")
