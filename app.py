@@ -8,14 +8,9 @@ Architecture:
 
 import os, json, math, time, threading, pickle
 import numpy as np
-import pandas as pd
 import torch
-import torch.nn.functional as F
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split
 
 # Qiskit integration (optional — graceful degradation if not installed)
 try:
@@ -32,7 +27,7 @@ except ImportError:
 # ─── Configuration ───────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "qdt_fraud_model")
-CSV_PATH = os.path.join(BASE_DIR, "creditcard.csv")
+PREPROCESS_PATH = os.path.join(BASE_DIR, "preprocessed", "pipeline.pkl")
 N_QUBITS = 4
 N_LAYERS = 10
 N_STATES = 2 ** N_QUBITS          # 16
@@ -246,73 +241,37 @@ class QDTFraudModel:
         }
 
 
-# ─── Data Pipeline (matches exact training preprocessing) ────────────
+# ─── Data Pipeline (loads preprocessed data from build step) ─────────
 class DataPipeline:
     """
-    Reproduces the EXACT preprocessing from training notebook:
-    1. Subsample: 1000 normal + all 492 fraud (random_state=42)
-    2. Features: ALL columns except Class (includes Time)
-    3. MinMaxScaler(feature_range=(-1, 1)) fitted on subsample
-    4. PCA(n_components=4) fitted on subsample
-    5. Train/test split: 80/20 of normal, test = val_normal + all fraud
+    Loads preprocessed data saved by build.py.
+    All heavy CSV processing happens at build time, not runtime.
     """
 
-    def __init__(self, csv_path):
-        print("[Pipeline] Loading CSV...")
-        self.df = pd.read_csv(csv_path)
-        print(f"  Loaded {len(self.df)} rows, {len(self.df.columns)} columns")
+    def __init__(self, preprocess_path):
+        print("[Pipeline] Loading preprocessed data...")
+        with open(preprocess_path, "rb") as f:
+            data = pickle.load(f)
 
-        # ── EXACT training preprocessing ──
-        # Subsample: 1000 normal + all fraud
-        normal_df = self.df[self.df["Class"] == 0]
-        fraud_df = self.df[self.df["Class"] == 1]
-        normal_sample = normal_df.sample(n=1000, random_state=42)
-        df_small = pd.concat([normal_sample, fraud_df]).reset_index(drop=True)
-
-        # Features: ALL columns except Class (includes Time!)
-        self.feature_cols = list(df_small.columns[:-1])  # everything except 'Class'
-        print(f"  Features ({len(self.feature_cols)}): {self.feature_cols[:3]}...{self.feature_cols[-2:]}")
-
-        # MinMaxScaler (-1, 1) — fitted on combined subsample
-        self.scaler = MinMaxScaler(feature_range=(-1, 1))
-        df_small[self.feature_cols] = self.scaler.fit_transform(df_small[self.feature_cols])
-
-        # PCA to 4 components — fitted on combined subsample
-        self.pca = PCA(n_components=PCA_COMPONENTS)
-        df_pca = pd.DataFrame(
-            self.pca.fit_transform(df_small[self.feature_cols]),
-            columns=[f"PC{i+1}" for i in range(PCA_COMPONENTS)]
-        )
-        df_pca["Class"] = df_small["Class"].values
-        print(f"  PCA variance ratio: {self.pca.explained_variance_ratio_.round(4).tolist()}")
-
-        # Train/test split (same as training)
-        train_normal, val_normal = train_test_split(
-            df_pca[df_pca["Class"] == 0], test_size=0.2, random_state=42
-        )
-        self.X_train = train_normal.drop("Class", axis=1).values.astype(np.float32)
-        test_mixed = pd.concat([val_normal, df_pca[df_pca["Class"] == 1]])
-        self.X_test = test_mixed.drop("Class", axis=1).values.astype(np.float32)
-        self.y_test = test_mixed["Class"].values
-
-        print(f"  Train (normal): {self.X_train.shape}")
-        print(f"  Test (mixed):   {self.X_test.shape} ({sum(self.y_test==0)} normal, {sum(self.y_test==1)} fraud)")
-
-        # Build stream queue for dashboard (shuffled mix from full dataset)
-        stream_normal = normal_df.sample(n=min(2000, len(normal_df)), random_state=123)
-        stream_combined = pd.concat([stream_normal, fraud_df]).sample(frac=1, random_state=42)
-        self.stream_queue = stream_combined.to_dict("records")
+        self.scaler = data["scaler"]
+        self.pca = data["pca"]
+        self.feature_cols = data["feature_cols"]
+        self.X_train = data["X_train"]
+        self.X_test = data["X_test"]
+        self.y_test = data["y_test"]
+        self.stream_queue = data["stream_queue"]
+        self.total_rows = data["total_rows"]
         self.stream_index = 0
 
         # Recent errors for dynamic threshold
         self.recent_errors = []
         self.calibrated_threshold = BASE_THRESHOLD
 
+        print(f"  Features: {len(self.feature_cols)}")
+        print(f"  Train (normal): {self.X_train.shape}")
+        print(f"  Test (mixed):   {self.X_test.shape}")
         print(f"  Stream queue: {len(self.stream_queue)} transactions")
-
-        # Free the full DataFrame to save memory (keep only the row count)
-        self.total_rows = len(self.df)
-        del self.df
+        print(f"  Total rows: {self.total_rows}")
 
     def transform(self, row):
         """Transform a single transaction row to PCA features."""
@@ -445,7 +404,7 @@ def initialize():
     model = QDTFraudModel(weights)
 
     print("\n[2/3] Initializing data pipeline...")
-    pipeline = DataPipeline(CSV_PATH)
+    pipeline = DataPipeline(PREPROCESS_PATH)
 
     stats["start_time"] = time.time()
 
