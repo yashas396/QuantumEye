@@ -1,3 +1,6 @@
+[project]
+name = "quantumeye-aqvh"
+
 [build]
 builder = "nixpacks"
 
