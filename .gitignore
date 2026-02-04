@@ -1,6 +1,5 @@
-# Data files (too large for git)
+# Raw CSV (use compressed .gz for deployment)
 creditcard.csv
-*.csv
 
 # Python cache
 __pycache__/
@@ -19,12 +18,10 @@ env/
 *.swp
 *.swo
 
-# Model files (large)
+# Large files not needed for deployment
 *.pth
-*.pkl
-qdt_fraud_model/
-qdt_fraud_model_.pth/
 *.zip
+*.pptx
 
 # System
 .DS_Store
